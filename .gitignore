@@ -1,0 +1,15 @@
+.cache/
+__pycache__/
+*.py[cod]
+
+# Full source data is too large for normal GitHub uploads.
+data.jsonl
+image.zip
+
+# Keep only the small test images referenced by data_t.jsonl.
+image/*
+!image/Circles/
+image/Circles/*
+!image/Circles/3000_1.png
+!image/Circles/3000_2.png
+!image/Circles/3000_3.png

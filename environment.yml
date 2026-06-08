@@ -1,0 +1,6 @@
+name: cadedit-v1
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - cadquery
