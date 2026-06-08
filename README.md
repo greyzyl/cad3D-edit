@@ -1,6 +1,6 @@
 # CAD3D Edit Dataset Pipeline
 
-V1 prototype for building CAD edit datasets from dimensioned three-view drawings and CadQuery programs.
+Dataset pipeline for building CAD edit supervision from dimensioned three-view drawings and CadQuery programs.
 
 The training task is:
 
@@ -11,13 +11,17 @@ output: edited executable CadQuery code
 
 The target code is generated deterministically from the original CadQuery code and edit candidates. A multimodal LLM is used only after CadQuery validation to write natural edit instructions.
 
-See [CAD_EDIT_PIPELINE_V1.md](CAD_EDIT_PIPELINE_V1.md) for the full workflow, commands, intermediate JSONL formats, and validation steps.
+Available branches:
+
+- [V1 parameter edits](CAD_EDIT_PIPELINE_V1.md): single numeric edits for `.circle()`, `.hole()`, `.extrude()`, `.box()`, `.chamfer()`, and `.fillet()`.
+- [V2 structural edits](CAD_EDIT_PIPELINE_V2.md): add-only local structures such as through holes, blind holes, rectangular slots, and pockets.
 
 ## Quick Start
 
 ```powershell
 conda env create -f environment.yml
 conda run -n cadedit-v1 python scripts/generate_cad_edit_dataset.py --input data_t.jsonl --output outputs/cad_edit_v1.jsonl --no-final-output
+conda run -n cadedit-v1 python scripts/generate_cad_edit_structural_dataset.py --input data_t.jsonl --output outputs/cad_edit_v2.jsonl
 ```
 
 For MLLM instruction generation, set the Bailian/DashScope API key in the shell before running the instruction stage:

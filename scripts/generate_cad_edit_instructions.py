@@ -20,7 +20,9 @@ DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/compl
 DEFAULT_MODEL = "qwen-vl-plus"
 DEFAULT_API_KEY_ENVS = ("DASHSCOPE_API_KEY", "BAILIAN_API_KEY")
 FORBIDDEN_CODE_TOKENS = ("cadquery", "cq.", "workplane", "```", "result =", "target_code")
-FORBIDDEN_COMPLEX_EDIT_TOKENS = ("新增", "删除", "移除", "移动", "旋转", "复制")
+FORBIDDEN_V1_COMPLEX_EDIT_TOKENS = ("新增", "添加", "删除", "移除", "移动", "旋转", "复制", "替换")
+FORBIDDEN_V2_UNSUPPORTED_EDIT_TOKENS = ("删除", "移除", "移动", "旋转", "复制", "替换")
+FORBIDDEN_V2_IMPLEMENTATION_TOKENS = ("workplane", "工作平面", "原点", "xy", "xz", "yz")
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -74,14 +76,52 @@ def number_variants(value: Any) -> set[str]:
     return {item for item in variants if item}
 
 
+def edit_candidate_from_record(record: dict[str, Any]) -> dict[str, Any] | None:
+    for key in ("edit_candidate", "structural_candidate", "edit_record"):
+        value = record.get(key)
+        if isinstance(value, dict):
+            return value
+    return None
+
+
+def is_structural_record(record: dict[str, Any]) -> bool:
+    candidate = edit_candidate_from_record(record)
+    return isinstance(candidate, dict) and isinstance(candidate.get("edit_type"), str)
+
+
+def instruction_mode(record: dict[str, Any]) -> str:
+    return "structural" if is_structural_record(record) else "parameter"
+
+
+def fallback_structural_instruction(edit_record: dict[str, Any]) -> str:
+    primitive = edit_record.get("primitive")
+    if not isinstance(primitive, dict):
+        primitive = {}
+    edit_type = edit_record.get("edit_type")
+    if edit_type == "add_through_hole":
+        radius = primitive.get("radius", "")
+        return f"在零件主平面上添加一个半径为 {radius} 的贯穿圆孔。"
+    if edit_type == "add_blind_hole":
+        radius = primitive.get("radius", "")
+        depth = primitive.get("depth", "")
+        return f"在零件主平面上添加一个半径为 {radius}、深度为 {depth} 的盲孔。"
+    if edit_type == "add_rectangular_slot":
+        return "在零件主平面上添加一个矩形槽。"
+    if edit_type == "add_pocket":
+        return "在零件主平面上添加一个矩形凹陷。"
+    return "在零件主平面上添加一个局部结构。"
+
+
 def fallback_instruction(record: dict[str, Any]) -> str:
     existing = record.get("fallback_instruction")
     if isinstance(existing, str) and existing.strip():
         return existing
 
-    edit_record = record.get("edit_record")
+    edit_record = edit_candidate_from_record(record)
     if not isinstance(edit_record, dict):
         return "根据给定参数修改零件尺寸，其他结构保持不变。"
+    if isinstance(edit_record.get("edit_type"), str):
+        return fallback_structural_instruction(edit_record)
     call = edit_record.get("call", "参数")
     old = edit_record.get("old", "")
     new = edit_record.get("new", "")
@@ -89,29 +129,55 @@ def fallback_instruction(record: dict[str, Any]) -> str:
 
 
 def build_prompt_text(record: dict[str, Any]) -> str:
-    edit_candidate = record.get("edit_candidate")
+    edit_candidate = edit_candidate_from_record(record)
     validation_report = record.get("validation_report")
-    prompt_payload = {
-        "task": "为 CAD 编辑数据生成自然语言指令",
-        "important_rules": [
+    mode = instruction_mode(record)
+    if mode == "structural":
+        important_rules = [
             "只输出自然语言编辑指令，不要输出 CadQuery 代码。",
-            "不要描述新增、删除、移动、旋转等没有证据的复杂编辑。",
+            "这是 V2 结构级 add-only 编辑，必须忠实表达 edit_candidate 中的 edit_type、target_region 和 primitive。",
+            "如果 edit_candidate 中包含 instruction_hints，优先使用 instruction_hints 里的 human_feature_name、diameter、length、width、depth。",
+            "可以使用添加孔、开槽、添加凹陷等人类 CAD 编辑表达。",
+            "可以提到孔径、半径、深度、槽尺寸等 primitive 尺寸。",
+            "不要把 insertion_strategy.extrude、cutter depth 或贯穿切削余量描述成用户要求的特征深度。",
+            "不要照抄 Workplane、XY/XZ/YZ 平面、原点、坐标值或坐标轴正负方向等代码实现细节。",
+            "如果位置无法从三视图稳定判断，就用主平面、外表面、靠右区域、中心附近等视觉表达，或者不描述精确位置。",
+            "不要描述删除、移动、旋转、替换，除非 edit_candidate 明确支持。",
+            "不要虚构未出现在 edit_candidate 或三视图中的额外结构、数量或位置。",
+            "修改后的目标代码已经通过验证，但不会提供给你。",
+        ]
+        task = "为 CAD 结构级编辑数据生成自然语言指令"
+        output_schema = {
+            "instruction": "一句中文 CAD 结构编辑指令",
+            "confidence": "high|medium|low",
+            "mentions_old_new_values": False,
+        }
+    else:
+        important_rules = [
+            "只输出自然语言编辑指令，不要输出 CadQuery 代码。",
+            "不要描述新增、删除、移动、旋转、替换等 V1 不支持的复杂编辑。",
             "必须忠实表达 edit_candidate 中的 old -> new。",
             "可以参考原始三视图，让表达更像人类 CAD 编辑请求。",
             "如果无法从三视图判断语义，就退化为参数级描述。",
             "修改后的目标代码已经通过验证，但不会提供给你。",
-        ],
+        ]
+        task = "为 CAD 参数级编辑数据生成自然语言指令"
+        output_schema = {
+            "instruction": "一句中文 CAD 参数编辑指令",
+            "confidence": "high|medium|low",
+            "mentions_old_new_values": True,
+        }
+    prompt_payload = {
+        "task": task,
+        "instruction_mode": mode,
+        "important_rules": important_rules,
         "original_cadquery_code": record.get("original_code"),
         "edit_candidate": edit_candidate,
         "validation": {
             "edited_code_executed": True,
             "ok": isinstance(validation_report, dict) and validation_report.get("ok") is True,
         },
-        "output_schema": {
-            "instruction": "一句中文 CAD 编辑指令",
-            "confidence": "high|medium|low",
-            "mentions_old_new_values": True,
-        },
+        "output_schema": output_schema,
     }
     return (
         "请根据原始带尺寸三视图、原始 CadQuery 代码和 edit_candidate，生成贴近人类习惯的 CAD 编辑指令。\n"
@@ -136,10 +202,16 @@ def build_messages(record: dict[str, Any], image_root: Path, allow_missing_image
             content.append({"type": "image_url", "image_url": {"url": image_to_data_url(resolved)}})
             image_count += 1
 
+    mode = instruction_mode(record)
+    if mode == "structural":
+        system_content = "你是 CAD 数据集构造助手，负责把确定性的结构级编辑改写成人类自然编辑指令。"
+    else:
+        system_content = "你是 CAD 数据集构造助手，负责把确定性的参数编辑改写成人类自然编辑指令。"
+
     return [
         {
             "role": "system",
-            "content": "你是 CAD 数据集构造助手，负责把确定性的参数编辑改写成人类自然编辑指令。",
+            "content": system_content,
         },
         {"role": "user", "content": content},
     ], image_count
@@ -219,17 +291,21 @@ def extract_json_object(text: str) -> dict[str, Any]:
 def validate_instruction(instruction: str, record: dict[str, Any], require_values: bool) -> tuple[bool, list[str]]:
     reasons: list[str] = []
     normalized = instruction.lower()
+    structural = is_structural_record(record)
     if not instruction.strip():
         reasons.append("empty instruction")
     if any(token in normalized for token in FORBIDDEN_CODE_TOKENS):
         reasons.append("instruction contains code-like token")
-    if any(token in instruction for token in FORBIDDEN_COMPLEX_EDIT_TOKENS):
+    if structural:
+        if any(token in instruction for token in FORBIDDEN_V2_UNSUPPORTED_EDIT_TOKENS):
+            reasons.append("instruction mentions unsupported structural edit")
+        if any(token in normalized for token in FORBIDDEN_V2_IMPLEMENTATION_TOKENS):
+            reasons.append("instruction mentions implementation detail")
+    elif any(token in instruction for token in FORBIDDEN_V1_COMPLEX_EDIT_TOKENS):
         reasons.append("instruction mentions unsupported complex edit")
 
-    if require_values:
-        edit_record = record.get("edit_record")
-        if not isinstance(edit_record, dict):
-            edit_record = record.get("edit_candidate")
+    if require_values and not structural:
+        edit_record = edit_candidate_from_record(record)
         if isinstance(edit_record, dict):
             old_variants = number_variants(edit_record.get("old"))
             new_variants = number_variants(edit_record.get("new"))
@@ -266,6 +342,7 @@ def build_instruction_record(
         "used_original_code": True,
         "used_candidate": True,
         "included_target_code": False,
+        "instruction_mode": instruction_mode(record),
         "validation_ok": True,
         "fallback_used": fallback_used,
         "quality_reasons": quality_reasons,

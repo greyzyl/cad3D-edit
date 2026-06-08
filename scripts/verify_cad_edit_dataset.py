@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify generated V1 CAD edit dataset JSONL records."""
+"""Verify generated CAD edit dataset JSONL records."""
 
 from __future__ import annotations
 
@@ -10,6 +10,17 @@ import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
+
+
+V1_EDIT_KEYS = ("kind", "call", "arg_index", "old", "new", "matched_text")
+V2_EDIT_KEYS = (
+    "edit_type",
+    "target_region",
+    "primitive",
+    "insertion_strategy",
+    "affected_region_bbox",
+    "instruction_template",
+)
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -63,9 +74,20 @@ def validate_record(record: dict[str, Any], line_number: int) -> list[str]:
     if not isinstance(edit_record, dict):
         errors.append("hidden.edit_record must be an object")
     else:
-        for key in ("kind", "call", "arg_index", "old", "new", "matched_text"):
-            if key not in edit_record:
-                errors.append(f"hidden.edit_record missing {key}")
+        is_v1_edit = isinstance(edit_record.get("kind"), str)
+        is_v2_edit = isinstance(edit_record.get("edit_type"), str)
+        if is_v1_edit:
+            for key in V1_EDIT_KEYS:
+                if key not in edit_record:
+                    errors.append(f"hidden.edit_record missing {key}")
+        elif is_v2_edit:
+            for key in V2_EDIT_KEYS:
+                if key not in edit_record:
+                    errors.append(f"hidden.edit_record missing {key}")
+            if edit_record.get("insertion_strategy", {}).get("append_csg_block") is not True:
+                errors.append("hidden.edit_record.insertion_strategy.append_csg_block must be true")
+        else:
+            errors.append("hidden.edit_record must be either a V1 parameter edit or V2 structural edit")
 
     validation_report = hidden.get("validation_report")
     if not isinstance(validation_report, dict):
@@ -87,6 +109,7 @@ def main(argv: list[str] | None = None) -> int:
     records = read_jsonl(args.input)
     errors: list[str] = []
     kind_counts: Counter[str] = Counter()
+    structural_edit_type_counts: Counter[str] = Counter()
 
     for index, record in enumerate(records, start=1):
         errors.extend(validate_record(record, index))
@@ -95,10 +118,13 @@ def main(argv: list[str] | None = None) -> int:
             edit_record = hidden.get("edit_record")
             if isinstance(edit_record, dict) and isinstance(edit_record.get("kind"), str):
                 kind_counts[edit_record["kind"]] += 1
+            if isinstance(edit_record, dict) and isinstance(edit_record.get("edit_type"), str):
+                structural_edit_type_counts[edit_record["edit_type"]] += 1
 
     summary = {
         "records": len(records),
         "kind_counts": dict(sorted(kind_counts.items())),
+        "structural_edit_type_counts": dict(sorted(structural_edit_type_counts.items())),
         "errors": len(errors),
     }
     print(json.dumps(summary, ensure_ascii=False, indent=2))
