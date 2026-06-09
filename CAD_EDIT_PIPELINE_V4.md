@@ -1,33 +1,44 @@
 # CAD Edit Dataset Pipeline V4
 
-V4 adds the first conservative structural replacement branch on top of:
-
-- V1 parameter edits;
-- V2 add-only structural edits;
-- V3 high-confidence structural deletion.
-
-The initial V4 scope is intentionally narrow:
-
-- implemented: `replace_hole_with_slot`
-- not implemented: arbitrary feature replacement, slot-to-hole replacement, pocket replacement, boss replacement, edited three-view generation
-
-The training task remains:
+V4 is the conservative structural replacement branch. It builds training samples for:
 
 ```text
 input:  original dimensioned three-view drawings + natural-language replace instruction
 output: edited executable CadQuery code after replacing the target structure
 ```
 
-`P1` is generated deterministically. The MLLM is only used after validation to write the natural-language replace instruction. It never generates target CadQuery code.
+Target CadQuery `P1` is generated only by deterministic code editing or deterministic CSG composition. The MLLM is used only after validation to write the natural-language replacement instruction.
+
+## Scope
+
+Implemented replace edit types:
+
+| Edit type | Strategy | Notes |
+|---|---|---|
+| `replace_circular_cutout_with_slot` | delete circular cutout + append slot cutter | reuses V3 circular cutout deletion |
+| `replace_loop_holes_with_slots` | delete simple loop holes + append slot cutter | reuses V3 simple loop hole deletion |
+| `replace_circular_cutout_with_polygonal_cutout` | direct source replacement | `.circle(r)` -> `.polygon(6, r)` inside the cut block |
+| `replace_polygonal_cutout_with_circular_cutout` | direct source replacement | `.polygon(n, r)` -> conservative `.circle(r_in)` |
+| `replace_polygonal_cutout_with_slot` | delete polygonal cutout + append slot cutter | conservative geometry placement; many unsafe cases skipped |
+| `replace_chamfer_with_fillet` | direct source replacement | `.chamfer(c)` -> `.fillet(c)` |
+| `replace_fillet_with_chamfer` | direct source replacement | `.fillet(r)` -> `.chamfer(r)` |
+
+Not implemented:
+
+- arbitrary feature replacement;
+- slot-to-hole replacement;
+- pocket/boss replacement;
+- replace via low-confidence geometry inference;
+- edited three-view image generation.
 
 ## Version Boundary
 
 - V1: parameter-level numeric edits.
 - V2: add-only structural edits through appended CSG blocks.
-- V3: high-confidence `delete_hole` through source code block deletion.
-- V4: high-confidence `replace_hole_with_slot` implemented as `delete + add`.
+- V3: high-confidence structural deletion through source span deletion.
+- V4: high-confidence structural replacement as `delete + add` or direct primitive source replacement.
 
-V4 does not rewrite V1/V2/V3. It adds a separate script:
+V4 does not rewrite V1/V2/V3. It adds:
 
 ```text
 scripts/generate_cad_edit_replace_dataset.py
@@ -39,89 +50,147 @@ scripts/generate_cad_edit_replace_dataset.py
 CADExpert-style JSONL
   |
   v
-1. Extract P0 and images
+1. Extract images and original CadQuery P0
   |
   v
-2. Reuse V3 delete_hole candidate extraction
+2. Reuse V3 delete candidate extraction
   |
   v
-3. Delete the hole source block to produce P_deleted
+3. Build one or more replace candidates from each compatible delete candidate
   |
   v
-4. Validate P0 -> P_deleted with V3 delete checks
+4. Generate P_replace deterministically
   |
   v
-5. Build a rectangular slot cutter near the deleted-hole changed region
+5. Execute P0, intermediate code if any, and P_replace
   |
   v
-6. Append an explicit CSG cut block to P_deleted to produce P_replace
+6. Run replacement-type-specific validation
   |
   v
-7. Validate P_deleted -> P_replace and P0 -> P_replace
+7. Generate natural-language replace instruction after validation
   |
   v
-8. Generate instruction after validation
-  |
-  v
-9. Emit final records
+8. Emit final records: images + instruction -> edited CadQuery
 ```
 
-## Output Files
+## Replacement Strategies
 
-Default V4 outputs:
+### Delete Then Append Slot Cutter
+
+Used by:
+
+- `replace_circular_cutout_with_slot`
+- `replace_loop_holes_with_slots`
+- `replace_polygonal_cutout_with_slot`
+
+V4 first removes the old subtractive feature using the V3 delete span:
+
+```python
+intermediate_code = original_code[:block_span_start] + original_code[block_span_end:]
+```
+
+Then it appends a deterministic rectangular slot cutter:
+
+```python
+# V4 structural replacement: replace_circular_cutout_with_slot (v4rep_000001_001)
+v4_slot_cutter = cq.Workplane('XY').box(slot_x, slot_y, slot_z).translate((cx, cy, cz))
+result = result.cut(v4_slot_cutter)
+```
+
+Slot dimensions are derived from the old feature changed-region bbox and original bbox. If a safe local slot cannot be estimated, the candidate is skipped.
+
+### Direct Cutout Primitive Replacement
+
+Used by:
+
+- `replace_circular_cutout_with_polygonal_cutout`
+- `replace_polygonal_cutout_with_circular_cutout`
+
+Examples:
+
+```python
+.cut(cq.Workplane("XZ").circle(10).extrude(20))
+```
+
+becomes:
+
+```python
+.cut(cq.Workplane("XZ").polygon(6, 10).extrude(20))
+```
+
+For polygon-to-circle replacement, V4 uses a conservative inscribed-circle radius:
 
 ```text
-outputs/cad_edit_v4_replace_candidates.jsonl
-outputs/cad_edit_v4_validated_replace_edits.jsonl
-outputs/cad_edit_v4_replace_instructions.jsonl
-outputs/cad_edit_v4_replace.jsonl
+r_in = polygon_radius * cos(pi / sides)
 ```
+
+This avoids replacing a polygonal cutout with an oversized circular cutout that would destroy the outer profile.
+
+### Direct Finishing Replacement
+
+Used by:
+
+- `replace_chamfer_with_fillet`
+- `replace_fillet_with_chamfer`
+
+Examples:
+
+```python
+.edges("|Z").chamfer(4)
+.edges("|Z").fillet(4)
+```
+
+become:
+
+```python
+.edges("|Z").fillet(4)
+.edges("|Z").chamfer(4)
+```
+
+Only high-confidence chain suffixes are supported.
 
 ## Candidate Schema
 
-A V4 candidate is a structural replace record:
+A V4 candidate stores original, intermediate if applicable, target code, and the deterministic replacement record:
 
 ```json
 {
   "candidate_id": "v4rep_000001_001",
   "images": ["./image/Circles/3000_1.png", "./image/Circles/3000_2.png", "./image/Circles/3000_3.png"],
-  "original_code": "import cadquery as cq\nresult = ... .hole(12)",
+  "original_code": "import cadquery as cq\nresult = ...",
   "intermediate_code": "import cadquery as cq\nresult = ...",
-  "target_code": "import cadquery as cq\nresult = ...\n# V4 structural replacement: replace_hole_with_slot ...",
+  "target_code": "import cadquery as cq\nresult = ...",
   "replace_candidate": {
     "candidate_type": "structural_replace",
-    "edit_type": "replace_hole_with_slot",
+    "edit_type": "replace_circular_cutout_with_polygonal_cutout",
     "old_feature": {
       "candidate_type": "structural_delete",
-      "edit_type": "delete_hole",
-      "source_api": "hole",
+      "edit_type": "delete_circular_cutout",
+      "source_api": "cut",
       "parameters": {
-        "diameter": 12.0
+        "radius": 10.0,
+        "diameter": 20.0,
+        "depth": 30.0
       }
     },
     "new_feature": {
-      "feature": "rectangular_slot",
-      "replaces": "hole",
-      "center": {"x": 0.0, "y": 0.0, "z": 0.0},
-      "dims": {"x": 26.4, "y": 9.0, "z": 24.0},
-      "human_dimensions": {
-        "length": 26.4,
-        "width": 9.0
-      },
-      "affected_region_bbox": {"xmin": -13.2, "xmax": 13.2, "ymin": -4.5, "ymax": 4.5, "zmin": -12.0, "zmax": 12.0}
+      "feature": "polygonal_cutout",
+      "feature_type": "polygonal_cutout",
+      "sides": 6,
+      "radius": 10.0
     },
     "insertion_strategy": {
-      "operation": "cut",
-      "append_csg_block": true,
-      "method": "delete_then_append_slot_cutter"
+      "operation": "replace",
+      "append_csg_block": false,
+      "method": "direct_source_replacement"
     },
     "instruction_hints": {
       "operation": "replace",
-      "old_feature_name": "圆孔",
-      "new_feature_name": "矩形槽",
-      "diameter": 12.0,
-      "length": 26.4,
-      "width": 9.0
+      "old_feature_name": "圆形通孔",
+      "new_feature_name": "六边形通孔",
+      "radius": 10.0,
+      "sides": 6
     }
   },
   "delete_validation_report": {"ok": true},
@@ -129,147 +198,216 @@ A V4 candidate is a structural replace record:
 }
 ```
 
-Unlike V2 add candidates, V4 candidates include `intermediate_code` and `target_code` because the replacement candidate is defined by the concrete delete+add transformation.
+Validated rows add `fallback_instruction`; final rows expose only:
 
-## Code Generation
-
-V4 first removes the exact V3 delete span:
-
-```python
-intermediate_code = original_code[:block_span_start] + original_code[block_span_end:]
+```text
+images
+instruction
+target_code
+hidden.original_code
+hidden.intermediate_code
+hidden.edit_record
+hidden.validation_report
 ```
-
-Then it appends a CSG slot cutter:
-
-```python
-# V4 structural replacement: replace_hole_with_slot (v4rep_000001_001)
-v4_slot_cutter = cq.Workplane('XY').box(slot_x, slot_y, slot_z).translate((cx, cy, cz))
-result = result.cut(v4_slot_cutter)
-```
-
-The first prototype only uses axis-aligned rectangular slot cutters. It skips batch hole deletion candidates and arbitrary hole contexts.
 
 ## Validation
 
-V4 validation is two-stage plus a final locality check.
+V4 uses type-specific validators.
 
-Delete stage, `P0 -> P_deleted`:
+### Slot Replacement Validator
 
-- `P0` executes.
-- `P_deleted` executes.
-- volume increases after removing the subtractive hole.
-- bbox remains stable.
-- changed region is local.
+Applies to:
 
-Slot stage, `P_deleted -> P_replace`:
+- `replace_circular_cutout_with_slot`
+- `replace_loop_holes_with_slots`
+- `replace_polygonal_cutout_with_slot`
+- `replace_hole_with_slot` where present
 
-- `P_replace` executes and is non-empty.
-- volume decreases relative to `P_deleted`.
-- changed region is local and near the deleted-hole changed region.
-- bbox remains stable and does not collapse.
+Checks:
 
-Final check, `P0 -> P_replace`:
+- delete stage is valid;
+- `P0`, `P_deleted`, and `P_replace` execute;
+- `P_replace` is non-empty;
+- deleting the old subtractive feature increases volume;
+- adding the slot decreases volume relative to `P_deleted`;
+- bbox remains stable and does not collapse;
+- slot changed region is local and near the old feature;
+- final geometry differs from original and remains local.
 
-- final geometry is valid and non-empty.
-- final changed region is local.
-- final shape has a real geometric change.
+### Cutout Replacement Validator
 
-Failures are skipped by default.
+Applies to:
+
+- `replace_circular_cutout_with_polygonal_cutout`
+- `replace_polygonal_cutout_with_circular_cutout`
+
+Checks:
+
+- delete stage is valid;
+- `P0`, `P_deleted`, and `P_replace` execute;
+- `P_replace` is non-empty;
+- bbox remains stable;
+- new cutout creates non-empty geometry change;
+- new changed region is local and near the old feature;
+- final shape differs from original.
+
+Final volume direction is not constrained, because replacement may increase or decrease material depending on old/new primitive area.
+
+### Finishing Replacement Validator
+
+Applies to:
+
+- `replace_chamfer_with_fillet`
+- `replace_fillet_with_chamfer`
+
+Checks:
+
+- `P0` and `P_replace` execute;
+- `P_replace` is non-empty;
+- bbox remains stable and does not collapse;
+- volume changes non-trivially;
+- geometry changes non-trivially.
+
+No tiny local changed-region constraint is required because edge finishing may affect many edges.
 
 ## Instruction Generation
 
-The shared instruction generator now supports:
+Instruction generation uses `structural_replace` mode.
 
-- `parameter`
-- `structural_add`
-- `structural_delete`
-- `structural_replace`
-
-For `structural_replace`, the MLLM prompt receives:
-
-- original three-view images;
-- original CadQuery `P0`;
-- replace candidate / edit record;
-- validation summary.
-
-It does not receive `target_code`.
-
-Allowed wording includes:
+Allowed expressions include:
 
 - 替换
 - 改成
 - 换成
-- 将圆孔替换为矩形槽
+- 将 A 替换为 B
 
-Forbidden wording includes:
+Examples:
+
+```text
+将零件上的圆形通孔替换为六边形通孔，其余结构保持不变。
+将零件上的多边形通孔替换为圆形通孔，其余结构保持不变。
+将零件上的多边形通孔替换为矩形槽，其余结构保持不变。
+将零件边缘的倒角替换为圆角，其余结构保持不变。
+将零件边缘的圆角替换为倒角，其余结构保持不变。
+```
+
+Forbidden expressions include:
 
 - adding unrelated structures;
 - deleting unrelated structures;
-- moving, rotating, or copying;
-- implementation details such as CadQuery, Workplane, source span, block span, CSG, or cutter.
+- moving, rotating, copying;
+- CadQuery / Workplane / source span / block span / CSG / cutter implementation details.
+
+The MLLM prompt receives original three-view images, hidden original CadQuery `P0`, replace candidate/edit record, and validation summary. It does not receive `target_code`.
 
 ## Commands
 
-Generate candidates, validated edits, fallback instructions, and final records:
+Generate V4 records:
 
 ```powershell
-conda run -n cadedit-v1 python scripts/generate_cad_edit_replace_dataset.py --input data.jsonl --output outputs/cad_edit_v4_replace.jsonl
+conda run -n cadedit-v1 python scripts/generate_cad_edit_replace_dataset.py `
+  --input data_expert3_fixed_paths.jsonl `
+  --output outputs/cad_edit_v4_replace.jsonl `
+  --candidates-output outputs/cad_edit_v4_replace_candidates.jsonl `
+  --validated-output outputs/cad_edit_v4_validated_replace_edits.jsonl `
+  --instructions-output outputs/cad_edit_v4_replace_instructions.jsonl `
+  --max-replacements-per-sample 10
 ```
 
-Audit:
+Run V4-only coverage audit:
 
 ```powershell
-conda run -n cadedit-v1 python scripts/verify_cad_edit_replace_candidates.py --input outputs/cad_edit_v4_replace_candidates.jsonl
-conda run -n cadedit-v1 python scripts/verify_cad_edit_validated_replace_edits.py --input outputs/cad_edit_v4_validated_replace_edits.jsonl
-conda run -n cadedit-v1 python scripts/verify_cad_edit_dataset.py --input outputs/cad_edit_v4_replace.jsonl
+conda run -n cadedit-v1 python scripts/audit_cad_edit_coverage.py `
+  --input data_expert3_fixed_paths.jsonl `
+  --output-dir outputs/coverage_v4_replace_expanded `
+  --branches v4_replace `
+  --v4-max-replacements-per-sample 10 `
+  --samples-per-edit-type 4
 ```
 
 Generate MLLM instructions after validation:
 
 ```powershell
 $env:DASHSCOPE_API_KEY = "<your Bailian/DashScope API key>"
-conda run -n cadedit-v1 python scripts/generate_cad_edit_instructions.py --input outputs/cad_edit_v4_validated_replace_edits.jsonl --output outputs/cad_edit_v4_replace_instructions.jsonl --model qwen-vl-plus
+conda run -n cadedit-v1 python scripts/generate_cad_edit_instructions.py `
+  --input outputs/cad_edit_v4_validated_replace_edits.jsonl `
+  --output outputs/cad_edit_v4_replace_instructions.jsonl `
+  --model qwen-vl-plus
 ```
 
 Assemble final MLLM-instruction data:
 
 ```powershell
-conda run -n cadedit-v1 python scripts/assemble_cad_edit_dataset.py --validated-input outputs/cad_edit_v4_validated_replace_edits.jsonl --instructions-input outputs/cad_edit_v4_replace_instructions.jsonl --output outputs/cad_edit_v4_replace.jsonl
+conda run -n cadedit-v1 python scripts/assemble_cad_edit_dataset.py `
+  --validated-input outputs/cad_edit_v4_validated_replace_edits.jsonl `
+  --instructions-input outputs/cad_edit_v4_replace_instructions.jsonl `
+  --output outputs/cad_edit_v4_replace.jsonl
 ```
 
 Render before/after previews:
 
 ```powershell
-conda run -n cadedit-v1 python scripts/render_cad_edit_pairs.py --input outputs/cad_edit_v4_replace.jsonl --output-dir outputs/cad_edit_v4_replace_renders
+conda run -n cadedit-v1 python scripts/render_cad_edit_pairs.py `
+  --input outputs/coverage_v4_replace_expanded/preview_samples.jsonl `
+  --output-dir outputs/coverage_v4_replace_expanded/preview_gallery
 ```
 
-## Smoke Test
+## Current Full Audit
 
-Synthetic smoke output:
+Latest full audit:
 
 ```text
-outputs/cad_edit_v4_replace_smoke.jsonl
-outputs/cad_edit_v4_replace_smoke_renders/index.html
+input: data_expert3_fixed_paths.jsonl
+records: 14,935
+report: outputs/coverage_v4_replace_expanded/coverage_audit.json
+preview: outputs/coverage_v4_replace_expanded/preview_gallery/index.html
 ```
 
-Validated result:
+Branch summary:
 
-```text
-records: 1
-edit_type: replace_hole_with_slot
-candidate audit errors: 0
-validated audit errors: 0
-final dataset errors: 0
-unit tests: 26 OK
-```
+| Branch | Candidates | Validated | Pass rate | Failed |
+|---|---:|---:|---:|---:|
+| V4 replace | 9,903 | 8,012 | 80.90% | 1,891 |
+
+By edit type:
+
+| Edit type | Candidates | Validated | Pass rate |
+|---|---:|---:|---:|
+| `replace_chamfer_with_fillet` | 1,260 | 1,260 | 100.00% |
+| `replace_circular_cutout_with_polygonal_cutout` | 1,600 | 1,600 | 100.00% |
+| `replace_circular_cutout_with_slot` | 1,600 | 1,600 | 100.00% |
+| `replace_fillet_with_chamfer` | 2,396 | 1,213 | 50.63% |
+| `replace_loop_holes_with_slots` | 1,769 | 1,749 | 98.87% |
+| `replace_polygonal_cutout_with_circular_cutout` | 1,207 | 519 | 43.00% |
+| `replace_polygonal_cutout_with_slot` | 71 | 71 | 100.00% |
+
+By category:
+
+| Category | Candidates | Validated | Pass rate |
+|---|---:|---:|---:|
+| Circles | 4,770 | 4,770 | 100.00% |
+| Polygons | 2,660 | 769 | 28.91% |
+| Rects | 2,473 | 2,473 | 100.00% |
+
+Main rejection reasons:
+
+| Reason | Count |
+|---|---:|
+| `skipped_no_replace_candidate` | 6,703 |
+| `delete_skipped_no_delete_candidate` | 5,455 |
+| `delete_skipped_unsupported_hole_context` | 2,850 |
+| `validation:failed check: bbox_stable` | 1,140 |
+| `skipped_slot_geometry` | 1,136 |
+| `skipped_delete_validation_failed` | 1,070 |
+| `validation:failed check: new_feature_changed_region_local` | 519 |
+| `validation:Bnd_Box is void` | 169 |
+
+The current V4 branch covers seven replacement types and reaches 8,012 validated records. It is below the 10,000-12,000 aspirational target but now has the same order of magnitude as V3 delete while preserving conservative validation.
 
 ## Current Limitations
 
-V4 is intentionally conservative:
-
-- only single high-confidence `.hole(...)` source blocks are supported;
-- batch holes are skipped;
-- arrayed `pushPoints`, `rarray`, and `polarArray` hole edits are skipped through the reused V3 branch;
-- slot orientation is axis-aligned;
-- no arbitrary replacement or delete-slot/add-hole mode is implemented;
-- no edited three-view image generation is implemented.
+- Polygon replacement remains intentionally strict; many polygon samples are rejected because the replacement would change global bbox or create non-local geometry changes.
+- Slot replacement is axis-aligned.
+- No arbitrary replacement planner.
+- No replacement for pockets, bosses, pads, or arbitrary `.cut(...)` blocks.
+- No edited three-view image generation.
