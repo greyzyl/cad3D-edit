@@ -1,0 +1,96 @@
+{
+  "input_path": "data_expert3_fixed_paths.jsonl",
+  "input_records": 2490,
+  "start_index": 4981,
+  "limit": 2490,
+  "elapsed_seconds": 314.185,
+  "category_records": {
+    "Circles": 2490
+  },
+  "branches": {
+    "v4_replace": {
+      "branch": "V4 replace",
+      "candidates": 2366,
+      "validated": 2366,
+      "failed_validation": 0,
+      "pass_rate_percent": 100.0,
+      "by_category": {
+        "Circles": {
+          "candidates": 2366,
+          "validated": 2366,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "Polygons": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        },
+        "Rects": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        }
+      },
+      "by_edit_type": {
+        "replace_circular_cutout_with_polygonal_cutout": {
+          "candidates": 776,
+          "validated": 776,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "replace_circular_cutout_with_slot": {
+          "candidates": 776,
+          "validated": 776,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "replace_loop_holes_with_slots": {
+          "candidates": 814,
+          "validated": 814,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        }
+      },
+      "top_rejection_reasons": {
+        "skipped_no_replace_candidate": 900,
+        "delete_skipped_no_delete_candidate": 869,
+        "delete_skipped_unsupported_hole_context": 817,
+        "delete_skipped_geometry_error": 22,
+        "delete_geometry_error:result variable was not defined": 22,
+        "delete_skipped_unsupported_cut_context": 14,
+        "delete_skipped_syntax_error": 9,
+        "delete_syntax_error:unexpected indent (<unknown>, line 3)": 7,
+        "delete_syntax_error:invalid syntax (<unknown>, line 4)": 1,
+        "delete_syntax_error:unexpected indent (<unknown>, line 2)": 1
+      }
+    }
+  },
+  "v4_hole_diagnostics": {
+    "overall": {
+      "hole_calls_total": 817,
+      "simple_loop_holes": 814,
+      "circular_cutout_via_cut_circle_extrude": 778,
+      "hole_parse_error_records": 9,
+      "other_unsupported_hole_contexts": 3
+    },
+    "by_category": {
+      "Circles": {
+        "hole_calls_total": 817,
+        "simple_loop_holes": 814,
+        "circular_cutout_via_cut_circle_extrude": 778,
+        "hole_parse_error_records": 9,
+        "other_unsupported_hole_contexts": 3
+      }
+    }
+  },
+  "sample_seen_counts": {
+    "replace_circular_cutout_with_polygonal_cutout": 776,
+    "replace_circular_cutout_with_slot": 776,
+    "replace_loop_holes_with_slots": 814
+  },
+  "sample_records_path": "outputs\\coverage_v4_replace_expanded\\chunks\\chunk_02\\preview_samples.jsonl",
+  "render_gallery_path": "outputs\\coverage_v4_replace_expanded\\chunks\\chunk_02\\preview_gallery\\index.html"
+}

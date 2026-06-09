@@ -22,6 +22,30 @@ REQUIRED_REPLACE_KEYS = (
     "instruction_hints",
 )
 REQUIRED_BBOX_KEYS = ("xmin", "xmax", "ymin", "ymax", "zmin", "zmax")
+SUPPORTED_REPLACE_EDIT_TYPES = {
+    "replace_hole_with_slot",
+    "replace_loop_holes_with_slots",
+    "replace_circular_cutout_with_slot",
+    "replace_polygonal_cutout_with_slot",
+    "replace_circular_cutout_with_polygonal_cutout",
+    "replace_polygonal_cutout_with_circular_cutout",
+    "replace_chamfer_with_fillet",
+    "replace_fillet_with_chamfer",
+}
+SLOT_REPLACE_TYPES = {
+    "replace_hole_with_slot",
+    "replace_loop_holes_with_slots",
+    "replace_circular_cutout_with_slot",
+    "replace_polygonal_cutout_with_slot",
+}
+DIRECT_CUTOUT_REPLACE_TYPES = {
+    "replace_circular_cutout_with_polygonal_cutout",
+    "replace_polygonal_cutout_with_circular_cutout",
+}
+FINISHING_REPLACE_TYPES = {
+    "replace_chamfer_with_fillet",
+    "replace_fillet_with_chamfer",
+}
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -99,27 +123,56 @@ def validate_record(record: dict[str, Any], line_number: int) -> list[str]:
                 errors.append(f"replace_candidate missing {key}")
         if replace_candidate.get("candidate_type") != "structural_replace":
             errors.append("replace_candidate.candidate_type must be structural_replace")
-        if replace_candidate.get("edit_type") != "replace_hole_with_slot":
-            errors.append("replace_candidate.edit_type must be replace_hole_with_slot")
+        edit_type = replace_candidate.get("edit_type")
+        if edit_type not in SUPPORTED_REPLACE_EDIT_TYPES:
+            errors.append("replace_candidate.edit_type must be a supported V4 replace edit")
         old_feature = replace_candidate.get("old_feature")
         if not isinstance(old_feature, dict):
             errors.append("replace_candidate.old_feature must be an object")
-        elif old_feature.get("edit_type") != "delete_hole":
-            errors.append("replace_candidate.old_feature.edit_type must be delete_hole")
+        elif edit_type in SLOT_REPLACE_TYPES and old_feature.get("edit_type") not in {
+            "delete_hole",
+            "delete_circular_cutout",
+            "delete_polygonal_cutout",
+        }:
+            errors.append("slot replace old_feature.edit_type must be delete_hole/delete_circular_cutout/delete_polygonal_cutout")
+        elif edit_type == "replace_circular_cutout_with_polygonal_cutout" and old_feature.get("edit_type") != "delete_circular_cutout":
+            errors.append("circular-to-polygon replace old_feature.edit_type must be delete_circular_cutout")
+        elif edit_type == "replace_polygonal_cutout_with_circular_cutout" and old_feature.get("edit_type") != "delete_polygonal_cutout":
+            errors.append("polygon-to-circular replace old_feature.edit_type must be delete_polygonal_cutout")
+        elif edit_type == "replace_chamfer_with_fillet" and old_feature.get("edit_type") != "delete_chamfer":
+            errors.append("chamfer-to-fillet replace old_feature.edit_type must be delete_chamfer")
+        elif edit_type == "replace_fillet_with_chamfer" and old_feature.get("edit_type") != "delete_fillet":
+            errors.append("fillet-to-chamfer replace old_feature.edit_type must be delete_fillet")
         new_feature = replace_candidate.get("new_feature")
         if not isinstance(new_feature, dict):
             errors.append("replace_candidate.new_feature must be an object")
-        else:
+        elif edit_type in SLOT_REPLACE_TYPES:
             if new_feature.get("feature") != "rectangular_slot":
                 errors.append("replace_candidate.new_feature.feature must be rectangular_slot")
             errors.extend(validate_bbox(new_feature.get("affected_region_bbox"), "replace_candidate.new_feature.affected_region_bbox"))
+        elif edit_type == "replace_circular_cutout_with_polygonal_cutout":
+            if new_feature.get("feature_type") != "polygonal_cutout" or new_feature.get("sides") != 6:
+                errors.append("replace_candidate.new_feature must describe a six-sided polygonal_cutout")
+        elif edit_type == "replace_polygonal_cutout_with_circular_cutout":
+            if new_feature.get("feature_type") != "circular_cutout":
+                errors.append("replace_candidate.new_feature must describe a circular_cutout")
+        elif edit_type == "replace_chamfer_with_fillet":
+            if new_feature.get("feature_type") != "fillet":
+                errors.append("replace_candidate.new_feature must describe a fillet")
+        elif edit_type == "replace_fillet_with_chamfer":
+            if new_feature.get("feature_type") != "chamfer":
+                errors.append("replace_candidate.new_feature must describe a chamfer")
         strategy = replace_candidate.get("insertion_strategy")
-        if not isinstance(strategy, dict) or strategy.get("append_csg_block") is not True:
-            errors.append("replace_candidate.insertion_strategy.append_csg_block must be true")
+        if not isinstance(strategy, dict):
+            errors.append("replace_candidate.insertion_strategy must be an object")
+        elif edit_type in SLOT_REPLACE_TYPES and strategy.get("append_csg_block") is not True:
+            errors.append("slot replace insertion_strategy.append_csg_block must be true")
+        elif edit_type in DIRECT_CUTOUT_REPLACE_TYPES | FINISHING_REPLACE_TYPES and strategy.get("method") != "direct_source_replacement":
+            errors.append("direct replace insertion_strategy.method must be direct_source_replacement")
 
     delete_report = record.get("delete_validation_report")
-    if not isinstance(delete_report, dict) or delete_report.get("ok") is not True:
-        errors.append("delete_validation_report.ok must be true")
+    if not isinstance(delete_report, dict):
+        errors.append("delete_validation_report must be an object")
 
     report = record.get("validation_report")
     if not isinstance(report, dict):

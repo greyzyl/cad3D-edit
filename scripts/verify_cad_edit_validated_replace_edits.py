@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 
-REQUIRED_CHECKS = (
+SLOT_REQUIRED_CHECKS = (
     "delete_stage_ok",
     "original_executes",
     "deleted_executes",
@@ -29,6 +29,54 @@ REQUIRED_CHECKS = (
     "final_change_local",
     "final_has_geometric_change",
 )
+CUTOUT_REQUIRED_CHECKS = (
+    "delete_stage_ok",
+    "original_executes",
+    "deleted_executes",
+    "replaced_executes",
+    "replaced_non_empty",
+    "bbox_stable_original_to_deleted",
+    "bbox_stable_original_to_replaced",
+    "bbox_not_collapsed",
+    "new_feature_changed_region_non_empty",
+    "new_feature_changed_region_local",
+    "new_feature_near_old_feature",
+    "final_change_local",
+    "final_has_geometric_change",
+)
+FINISHING_REQUIRED_CHECKS = (
+    "original_executes",
+    "replaced_executes",
+    "replaced_non_empty",
+    "bbox_stable",
+    "bbox_not_collapsed",
+    "volume_changed_nontrivially",
+    "geometry_changed_nontrivially",
+)
+SUPPORTED_REPLACE_EDIT_TYPES = {
+    "replace_hole_with_slot",
+    "replace_loop_holes_with_slots",
+    "replace_circular_cutout_with_slot",
+    "replace_polygonal_cutout_with_slot",
+    "replace_circular_cutout_with_polygonal_cutout",
+    "replace_polygonal_cutout_with_circular_cutout",
+    "replace_chamfer_with_fillet",
+    "replace_fillet_with_chamfer",
+}
+SLOT_REPLACE_TYPES = {
+    "replace_hole_with_slot",
+    "replace_loop_holes_with_slots",
+    "replace_circular_cutout_with_slot",
+    "replace_polygonal_cutout_with_slot",
+}
+DIRECT_CUTOUT_REPLACE_TYPES = {
+    "replace_circular_cutout_with_polygonal_cutout",
+    "replace_polygonal_cutout_with_circular_cutout",
+}
+FINISHING_REPLACE_TYPES = {
+    "replace_chamfer_with_fillet",
+    "replace_fillet_with_chamfer",
+}
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -82,23 +130,37 @@ def validate_record(record: dict[str, Any], line_number: int) -> list[str]:
     errors.extend(validate_code(record.get("target_code"), "target_code"))
 
     replace_candidate = record.get("replace_candidate")
+    edit_type = None
     if not isinstance(replace_candidate, dict):
         errors.append("replace_candidate must be an object")
     else:
         if replace_candidate.get("candidate_type") != "structural_replace":
             errors.append("replace_candidate.candidate_type must be structural_replace")
-        if replace_candidate.get("edit_type") != "replace_hole_with_slot":
-            errors.append("replace_candidate.edit_type must be replace_hole_with_slot")
+        edit_type = replace_candidate.get("edit_type")
+        if edit_type not in SUPPORTED_REPLACE_EDIT_TYPES:
+            errors.append("replace_candidate.edit_type must be a supported V4 replace edit")
         if not isinstance(replace_candidate.get("old_feature"), dict):
             errors.append("replace_candidate.old_feature must be an object")
         new_feature = replace_candidate.get("new_feature")
         if not isinstance(new_feature, dict):
             errors.append("replace_candidate.new_feature must be an object")
-        elif new_feature.get("feature") != "rectangular_slot":
+        elif edit_type in SLOT_REPLACE_TYPES and new_feature.get("feature") != "rectangular_slot":
             errors.append("replace_candidate.new_feature.feature must be rectangular_slot")
+        elif edit_type == "replace_circular_cutout_with_polygonal_cutout" and new_feature.get("feature_type") != "polygonal_cutout":
+            errors.append("replace_candidate.new_feature must describe a polygonal_cutout")
+        elif edit_type == "replace_polygonal_cutout_with_circular_cutout" and new_feature.get("feature_type") != "circular_cutout":
+            errors.append("replace_candidate.new_feature must describe a circular_cutout")
+        elif edit_type == "replace_chamfer_with_fillet" and new_feature.get("feature_type") != "fillet":
+            errors.append("replace_candidate.new_feature must describe a fillet")
+        elif edit_type == "replace_fillet_with_chamfer" and new_feature.get("feature_type") != "chamfer":
+            errors.append("replace_candidate.new_feature must describe a chamfer")
         strategy = replace_candidate.get("insertion_strategy")
-        if not isinstance(strategy, dict) or strategy.get("append_csg_block") is not True:
-            errors.append("replace_candidate.insertion_strategy.append_csg_block must be true")
+        if not isinstance(strategy, dict):
+            errors.append("replace_candidate.insertion_strategy must be an object")
+        elif edit_type in SLOT_REPLACE_TYPES and strategy.get("append_csg_block") is not True:
+            errors.append("slot replace insertion_strategy.append_csg_block must be true")
+        elif edit_type in DIRECT_CUTOUT_REPLACE_TYPES | FINISHING_REPLACE_TYPES and strategy.get("method") != "direct_source_replacement":
+            errors.append("direct replace insertion_strategy.method must be direct_source_replacement")
 
     report = record.get("validation_report")
     if not isinstance(report, dict):
@@ -112,14 +174,20 @@ def validate_record(record: dict[str, Any], line_number: int) -> list[str]:
         if not isinstance(checks, dict):
             errors.append("validation_report.checks must be an object")
         else:
-            for key in REQUIRED_CHECKS:
+            if edit_type in DIRECT_CUTOUT_REPLACE_TYPES:
+                required_checks = CUTOUT_REQUIRED_CHECKS
+            elif edit_type in FINISHING_REPLACE_TYPES:
+                required_checks = FINISHING_REQUIRED_CHECKS
+            else:
+                required_checks = SLOT_REQUIRED_CHECKS
+            for key in required_checks:
                 if checks.get(key) is not True:
                     errors.append(f"validation_report.checks.{key} must be true")
         delete_delta = report.get("delete_volume_delta")
         slot_delta = report.get("slot_volume_delta")
-        if not isinstance(delete_delta, (int, float)) or delete_delta <= 0:
+        if edit_type in SLOT_REPLACE_TYPES and (not isinstance(delete_delta, (int, float)) or delete_delta <= 0):
             errors.append("validation_report.delete_volume_delta must be positive")
-        if not isinstance(slot_delta, (int, float)) or slot_delta >= 0:
+        if edit_type in SLOT_REPLACE_TYPES and (not isinstance(slot_delta, (int, float)) or slot_delta >= 0):
             errors.append("validation_report.slot_volume_delta must be negative")
 
     if not isinstance(record.get("fallback_instruction"), str) or not record.get("fallback_instruction", "").strip():

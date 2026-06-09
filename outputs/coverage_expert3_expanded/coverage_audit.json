@@ -1,0 +1,319 @@
+{
+  "input_path": "data_expert3_fixed_paths.jsonl",
+  "input_records": 14935,
+  "start_index": 1,
+  "limit": null,
+  "elapsed_seconds": 1395.662,
+  "category_records": {
+    "Circles": 5000,
+    "Polygons": 4941,
+    "Rects": 4994
+  },
+  "branches": {
+    "v1_parameter": {
+      "branch": "V1 parameter",
+      "candidates": 29131,
+      "validated": 28661,
+      "failed_validation": 470,
+      "pass_rate_percent": 98.3866,
+      "by_category": {
+        "Circles": {
+          "candidates": 13129,
+          "validated": 13040,
+          "failed_validation": 89,
+          "pass_rate_percent": 99.3221
+        },
+        "Polygons": {
+          "candidates": 8586,
+          "validated": 8445,
+          "failed_validation": 141,
+          "pass_rate_percent": 98.3578
+        },
+        "Rects": {
+          "candidates": 7416,
+          "validated": 7176,
+          "failed_validation": 240,
+          "pass_rate_percent": 96.7638
+        }
+      },
+      "by_edit_type": {
+        "chamfer": {
+          "candidates": 1261,
+          "validated": 1122,
+          "failed_validation": 139,
+          "pass_rate_percent": 88.977
+        },
+        "circle": {
+          "candidates": 6593,
+          "validated": 6547,
+          "failed_validation": 46,
+          "pass_rate_percent": 99.3023
+        },
+        "extrude": {
+          "candidates": 16030,
+          "validated": 15971,
+          "failed_validation": 59,
+          "pass_rate_percent": 99.6319
+        },
+        "fillet": {
+          "candidates": 2397,
+          "validated": 2171,
+          "failed_validation": 226,
+          "pass_rate_percent": 90.5715
+        },
+        "hole": {
+          "candidates": 2850,
+          "validated": 2850,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        }
+      },
+      "top_rejection_reasons": {
+        "validation:StdFail_NotDone: BRep_API: command not done": 365,
+        "validation:result variable was not defined": 102,
+        "skipped_original_syntax_error": 96,
+        "skipped_no_candidates": 20,
+        "validation:ValueError: Cannot cut type '<class 'ellipsis'>'": 3
+      }
+    },
+    "v2_add": {
+      "branch": "V2 add",
+      "candidates": 58200,
+      "validated": 56891,
+      "failed_validation": 1309,
+      "pass_rate_percent": 97.7509,
+      "by_category": {
+        "Circles": {
+          "candidates": 18844,
+          "validated": 18844,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "Polygons": {
+          "candidates": 19600,
+          "validated": 18291,
+          "failed_validation": 1309,
+          "pass_rate_percent": 93.3214
+        },
+        "Rects": {
+          "candidates": 19756,
+          "validated": 19756,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        }
+      },
+      "by_edit_type": {
+        "add_blind_hole": {
+          "candidates": 14550,
+          "validated": 13966,
+          "failed_validation": 584,
+          "pass_rate_percent": 95.9863
+        },
+        "add_pocket": {
+          "candidates": 14550,
+          "validated": 14388,
+          "failed_validation": 162,
+          "pass_rate_percent": 98.8866
+        },
+        "add_rectangular_slot": {
+          "candidates": 14550,
+          "validated": 14527,
+          "failed_validation": 23,
+          "pass_rate_percent": 99.8419
+        },
+        "add_through_hole": {
+          "candidates": 14550,
+          "validated": 14010,
+          "failed_validation": 540,
+          "pass_rate_percent": 96.2887
+        }
+      },
+      "top_rejection_reasons": {
+        "validation:changed-region check failed: Bnd_Box is void": 1308,
+        "skipped_bad_candidate_geometry": 828,
+        "skipped_geometry_error": 178,
+        "geometry_error:result variable was not defined": 78,
+        "geometry_error:unexpected indent (<cadquery_source>, line 3)": 72,
+        "geometry_error:unexpected indent (<cadquery_source>, line 2)": 16,
+        "geometry_error:invalid syntax (<cadquery_source>, line 2)": 4,
+        "geometry_error:Cannot cut type '<class 'ellipsis'>'": 3,
+        "geometry_error:invalid syntax (<cadquery_source>, line 4)": 2,
+        "geometry_error:invalid syntax (<cadquery_source>, line 3)": 2,
+        "geometry_error:BRep_API: command not done": 1,
+        "validation:failed check: volume_direction_ok": 1
+      }
+    },
+    "v3_delete": {
+      "branch": "V3 delete",
+      "candidates": 4439,
+      "validated": 3369,
+      "failed_validation": 1070,
+      "pass_rate_percent": 75.8955,
+      "by_category": {
+        "Circles": {
+          "candidates": 3170,
+          "validated": 3170,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "Polygons": {
+          "candidates": 1269,
+          "validated": 199,
+          "failed_validation": 1070,
+          "pass_rate_percent": 15.6816
+        },
+        "Rects": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        }
+      },
+      "by_edit_type": {
+        "delete_circular_cutout": {
+          "candidates": 1600,
+          "validated": 1600,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "delete_hole": {
+          "candidates": 2839,
+          "validated": 1769,
+          "failed_validation": 1070,
+          "pass_rate_percent": 62.3107
+        }
+      },
+      "top_rejection_reasons": {
+        "skipped_no_delete_candidate": 10318,
+        "skipped_unsupported_hole_context": 2850,
+        "skipped_unsupported_cut_context": 1247,
+        "validation:failed check: bbox_stable": 932,
+        "validation:failed check: changed_region_not_global": 121,
+        "skipped_syntax_error": 96,
+        "skipped_geometry_error": 82,
+        "geometry_error:result variable was not defined": 78,
+        "syntax_error:unexpected indent (<unknown>, line 3)": 72,
+        "validation:changed-region check failed: Bnd_Box is void": 17,
+        "syntax_error:unexpected indent (<unknown>, line 2)": 16,
+        "syntax_error:invalid syntax (<unknown>, line 2)": 4,
+        "geometry_error:Cannot cut type '<class 'ellipsis'>'": 3,
+        "syntax_error:invalid syntax (<unknown>, line 4)": 2,
+        "syntax_error:invalid syntax (<unknown>, line 3)": 2,
+        "geometry_error:BRep_API: command not done": 1
+      }
+    },
+    "v4_replace": {
+      "branch": "V4 replace",
+      "candidates": 3369,
+      "validated": 3349,
+      "failed_validation": 20,
+      "pass_rate_percent": 99.4064,
+      "by_category": {
+        "Circles": {
+          "candidates": 3170,
+          "validated": 3170,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "Polygons": {
+          "candidates": 199,
+          "validated": 179,
+          "failed_validation": 20,
+          "pass_rate_percent": 89.9497
+        },
+        "Rects": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        }
+      },
+      "by_edit_type": {
+        "replace_circular_cutout_with_slot": {
+          "candidates": 1600,
+          "validated": 1600,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "replace_loop_holes_with_slots": {
+          "candidates": 1769,
+          "validated": 1749,
+          "failed_validation": 20,
+          "pass_rate_percent": 98.8694
+        }
+      },
+      "top_rejection_reasons": {
+        "skipped_no_replace_candidate": 11566,
+        "delete_skipped_no_delete_candidate": 10318,
+        "delete_skipped_unsupported_hole_context": 2850,
+        "delete_skipped_unsupported_cut_context": 1247,
+        "skipped_delete_validation_failed": 1070,
+        "delete_skipped_syntax_error": 96,
+        "delete_skipped_geometry_error": 82,
+        "delete_geometry_error:result variable was not defined": 78,
+        "delete_syntax_error:unexpected indent (<unknown>, line 3)": 72,
+        "validation:failed check: slot_changed_region_local": 20,
+        "delete_syntax_error:unexpected indent (<unknown>, line 2)": 16,
+        "delete_syntax_error:invalid syntax (<unknown>, line 2)": 4,
+        "delete_geometry_error:Cannot cut type '<class 'ellipsis'>'": 3,
+        "delete_syntax_error:invalid syntax (<unknown>, line 4)": 2,
+        "delete_syntax_error:invalid syntax (<unknown>, line 3)": 2,
+        "delete_geometry_error:BRep_API: command not done": 1
+      }
+    }
+  },
+  "v4_hole_diagnostics": {
+    "overall": {
+      "hole_calls_total": 2850,
+      "simple_loop_holes": 2839,
+      "circular_cutout_via_cut_circle_extrude": 1607,
+      "hole_parse_error_records": 96,
+      "other_unsupported_hole_contexts": 11
+    },
+    "by_category": {
+      "Circles": {
+        "circular_cutout_via_cut_circle_extrude": 1607,
+        "hole_calls_total": 1579,
+        "simple_loop_holes": 1570,
+        "hole_parse_error_records": 40,
+        "other_unsupported_hole_contexts": 9
+      },
+      "Polygons": {
+        "hole_calls_total": 1271,
+        "simple_loop_holes": 1269,
+        "hole_parse_error_records": 22,
+        "other_unsupported_hole_contexts": 2,
+        "circular_cutout_via_cut_circle_extrude": 0
+      },
+      "Rects": {
+        "hole_parse_error_records": 34,
+        "circular_cutout_via_cut_circle_extrude": 0
+      }
+    }
+  },
+  "sample_seen_counts": {
+    "add_blind_hole": 12,
+    "add_pocket": 12,
+    "add_rectangular_slot": 12,
+    "add_through_hole": 12,
+    "chamfer": 12,
+    "circle": 8,
+    "delete_circular_cutout": 8,
+    "delete_hole": 10,
+    "extrude": 12,
+    "fillet": 12,
+    "hole": 10,
+    "replace_circular_cutout_with_slot": 8,
+    "replace_loop_holes_with_slots": 10
+  },
+  "sample_records_path": "outputs\\coverage_expert3_expanded\\preview_samples.jsonl",
+  "render_gallery_path": "outputs\\coverage_expert3_expanded\\preview_gallery\\index.html",
+  "chunk_reports": [
+    "outputs\\coverage_expert3_expanded\\chunks\\chunk_01\\coverage_audit.json",
+    "outputs\\coverage_expert3_expanded\\chunks\\chunk_02\\coverage_audit.json",
+    "outputs\\coverage_expert3_expanded\\chunks\\chunk_03\\coverage_audit.json",
+    "outputs\\coverage_expert3_expanded\\chunks\\chunk_04\\coverage_audit.json",
+    "outputs\\coverage_expert3_expanded\\chunks\\chunk_05\\coverage_audit.json",
+    "outputs\\coverage_expert3_expanded\\chunks\\chunk_06\\coverage_audit.json"
+  ]
+}

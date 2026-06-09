@@ -23,6 +23,23 @@ REQUIRED_CHECKS = (
     "changed_region_not_global",
     "volume_delta_matches_changed_region",
 )
+FINISHING_REQUIRED_CHECKS = (
+    "original_executes",
+    "edited_executes",
+    "edited_non_empty",
+    "bbox_stable",
+    "bbox_not_collapsed",
+    "volume_changed_nontrivially",
+    "geometry_changed_nontrivially",
+)
+SUPPORTED_DELETE_EDIT_TYPES = {
+    "delete_hole",
+    "delete_circular_cutout",
+    "delete_polygonal_cutout",
+    "delete_fillet",
+    "delete_chamfer",
+}
+FINISHING_DELETE_TYPES = {"delete_fillet", "delete_chamfer"}
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -70,13 +87,15 @@ def validate_record(record: dict[str, Any], line_number: int) -> list[str]:
             errors.append(f"target_code syntax error: {exc}")
 
     candidate = record.get("delete_candidate")
+    edit_type = None
     if not isinstance(candidate, dict):
         errors.append("delete_candidate must be an object")
     else:
+        edit_type = candidate.get("edit_type")
         if candidate.get("candidate_type") != "structural_delete":
             errors.append("delete_candidate.candidate_type must be structural_delete")
-        if candidate.get("edit_type") != "delete_hole":
-            errors.append("delete_candidate.edit_type must be delete_hole")
+        if edit_type not in SUPPORTED_DELETE_EDIT_TYPES:
+            errors.append("delete_candidate.edit_type is unsupported")
         block_text = candidate.get("block_text")
         if isinstance(block_text, str) and isinstance(target_code, str) and block_text in target_code:
             errors.append("target_code still contains deleted block_text")
@@ -93,12 +112,16 @@ def validate_record(record: dict[str, Any], line_number: int) -> list[str]:
         if not isinstance(checks, dict):
             errors.append("validation_report.checks must be an object")
         else:
-            for key in REQUIRED_CHECKS:
+            required_checks = FINISHING_REQUIRED_CHECKS if edit_type in FINISHING_DELETE_TYPES else REQUIRED_CHECKS
+            for key in required_checks:
                 if checks.get(key) is not True:
                     errors.append(f"validation_report.checks.{key} must be true")
         volume_delta = report.get("volume_delta")
-        if not isinstance(volume_delta, (int, float)) or volume_delta <= 0:
-            errors.append("validation_report.volume_delta must be positive for delete_hole")
+        if edit_type in FINISHING_DELETE_TYPES:
+            if not isinstance(volume_delta, (int, float)) or abs(volume_delta) <= 0:
+                errors.append("validation_report.volume_delta must be non-zero for finishing delete")
+        elif not isinstance(volume_delta, (int, float)) or volume_delta <= 0:
+            errors.append("validation_report.volume_delta must be positive for structural delete")
 
     if not isinstance(record.get("fallback_instruction"), str) or not record.get("fallback_instruction", "").strip():
         errors.append("fallback_instruction must be non-empty")

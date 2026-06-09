@@ -23,6 +23,15 @@ REQUIRED_DELETE_KEYS = (
     "instruction_hints",
 )
 
+SUPPORTED_DELETE_EDIT_TYPES = {
+    "delete_hole",
+    "delete_circular_cutout",
+    "delete_polygonal_cutout",
+    "delete_fillet",
+    "delete_chamfer",
+}
+SUPPORTED_SOURCE_APIS = {"hole", "cut", "cut_polygon", "fillet", "chamfer"}
+
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
@@ -64,10 +73,11 @@ def validate_record(record: dict[str, Any], line_number: int) -> list[str]:
                 errors.append(f"delete_candidate missing {key}")
         if candidate.get("candidate_type") != "structural_delete":
             errors.append("delete_candidate.candidate_type must be structural_delete")
-        if candidate.get("edit_type") != "delete_hole":
-            errors.append("delete_candidate.edit_type must be delete_hole")
-        if candidate.get("source_api") != "hole":
-            errors.append("delete_candidate.source_api must be hole")
+        edit_type = candidate.get("edit_type")
+        if edit_type not in SUPPORTED_DELETE_EDIT_TYPES:
+            errors.append("delete_candidate.edit_type is unsupported")
+        if candidate.get("source_api") not in SUPPORTED_SOURCE_APIS:
+            errors.append("delete_candidate.source_api is unsupported")
         start = candidate.get("block_span_start")
         end = candidate.get("block_span_end")
         block_text = candidate.get("block_text")
@@ -76,8 +86,20 @@ def validate_record(record: dict[str, Any], line_number: int) -> list[str]:
         elif isinstance(original_code, str) and isinstance(block_text, str) and original_code[start:end] != block_text:
             errors.append("delete_candidate block span does not match block_text")
         parameters = candidate.get("parameters")
-        if not isinstance(parameters, dict) or not isinstance(parameters.get("diameter"), (int, float)):
-            errors.append("delete_candidate.parameters.diameter must be numeric")
+        if not isinstance(parameters, dict):
+            errors.append("delete_candidate.parameters must be an object")
+        elif edit_type in {"delete_hole", "delete_circular_cutout"}:
+            if not isinstance(parameters.get("diameter"), (int, float)):
+                errors.append("delete_candidate.parameters.diameter must be numeric")
+        elif edit_type == "delete_polygonal_cutout":
+            if not isinstance(parameters.get("sides"), int) or not isinstance(parameters.get("radius"), (int, float)):
+                errors.append("delete_candidate.parameters.sides and radius are required for polygonal cutout")
+        elif edit_type == "delete_fillet":
+            if not isinstance(parameters.get("radius"), (int, float)):
+                errors.append("delete_candidate.parameters.radius must be numeric for fillet")
+        elif edit_type == "delete_chamfer":
+            if not isinstance(parameters.get("distance"), (int, float)):
+                errors.append("delete_candidate.parameters.distance must be numeric for chamfer")
 
     return [f"line {line_number}: {error}" for error in errors]
 

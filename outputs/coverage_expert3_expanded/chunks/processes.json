@@ -1,0 +1,56 @@
+﻿[
+    {
+        "Chunk":  1,
+        "Id":  21384,
+        "StartIndex":  1,
+        "Limit":  2500,
+        "Dir":  "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_01",
+        "Stdout":  "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_01\\audit.stdout.log",
+        "Stderr":  "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_01\\audit.stderr.log"
+    },
+    {
+        "Chunk":  2,
+        "Id":  19092,
+        "StartIndex":  2501,
+        "Limit":  2500,
+        "Dir":  "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_02",
+        "Stdout":  "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_02\\audit.stdout.log",
+        "Stderr":  "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_02\\audit.stderr.log"
+    },
+    {
+        "Chunk":  3,
+        "Id":  21772,
+        "StartIndex":  5001,
+        "Limit":  2500,
+        "Dir":  "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_03",
+        "Stdout":  "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_03\\audit.stdout.log",
+        "Stderr":  "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_03\\audit.stderr.log"
+    },
+    {
+        "Chunk":  4,
+        "Id":  10764,
+        "StartIndex":  7501,
+        "Limit":  2500,
+        "Dir":  "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_04",
+        "Stdout":  "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_04\\audit.stdout.log",
+        "Stderr":  "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_04\\audit.stderr.log"
+    },
+    {
+        "Chunk":  5,
+        "Id":  30516,
+        "StartIndex":  10001,
+        "Limit":  2500,
+        "Dir":  "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_05",
+        "Stdout":  "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_05\\audit.stdout.log",
+        "Stderr":  "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_05\\audit.stderr.log"
+    },
+    {
+        "Chunk":  6,
+        "Id":  8544,
+        "StartIndex":  12501,
+        "Limit":  2435,
+        "Dir":  "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_06",
+        "Stdout":  "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_06\\audit.stdout.log",
+        "Stderr":  "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_06\\audit.stderr.log"
+    }
+]

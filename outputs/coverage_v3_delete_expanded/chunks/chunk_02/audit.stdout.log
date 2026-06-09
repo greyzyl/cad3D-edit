@@ -1,0 +1,126 @@
+{"processed": 500, "elapsed_seconds": 19.14, "v1_candidates": null, "v2_candidates": null, "v3_candidates": 248, "v4_candidates": null}
+{"processed": 1000, "elapsed_seconds": 51.46, "v1_candidates": null, "v2_candidates": null, "v3_candidates": 607, "v4_candidates": null}
+{"processed": 1500, "elapsed_seconds": 86.91, "v1_candidates": null, "v2_candidates": null, "v3_candidates": 989, "v4_candidates": null}
+{"processed": 2000, "elapsed_seconds": 119.62, "v1_candidates": null, "v2_candidates": null, "v3_candidates": 1353, "v4_candidates": null}
+{"processed": 2500, "elapsed_seconds": 140.38, "v1_candidates": null, "v2_candidates": null, "v3_candidates": 1677, "v4_candidates": null}
+{
+  "input_path": "data_expert3_fixed_paths.jsonl",
+  "input_records": 2500,
+  "start_index": 2501,
+  "limit": 2500,
+  "elapsed_seconds": 140.386,
+  "category_records": {
+    "Circles": 520,
+    "Polygons": 1482,
+    "Rects": 498
+  },
+  "branches": {
+    "v3_delete": {
+      "branch": "V3 delete",
+      "candidates": 1677,
+      "validated": 1005,
+      "failed_validation": 672,
+      "pass_rate_percent": 59.9284,
+      "by_category": {
+        "Circles": {
+          "candidates": 332,
+          "validated": 332,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "Polygons": {
+          "candidates": 1099,
+          "validated": 427,
+          "failed_validation": 672,
+          "pass_rate_percent": 38.8535
+        },
+        "Rects": {
+          "candidates": 246,
+          "validated": 246,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        }
+      },
+      "by_edit_type": {
+        "delete_chamfer": {
+          "candidates": 129,
+          "validated": 129,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "delete_circular_cutout": {
+          "candidates": 178,
+          "validated": 178,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "delete_fillet": {
+          "candidates": 468,
+          "validated": 117,
+          "failed_validation": 351,
+          "pass_rate_percent": 25.0
+        },
+        "delete_hole": {
+          "candidates": 539,
+          "validated": 218,
+          "failed_validation": 321,
+          "pass_rate_percent": 40.4453
+        },
+        "delete_polygonal_cutout": {
+          "candidates": 363,
+          "validated": 363,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        }
+      },
+      "top_rejection_reasons": {
+        "skipped_no_delete_candidate": 814,
+        "validation:failed check: bbox_stable": 629,
+        "skipped_unsupported_hole_context": 539,
+        "validation:failed check: changed_region_not_global": 38,
+        "skipped_geometry_error": 6,
+        "geometry_error:result variable was not defined": 6,
+        "validation:changed-region check failed: Bnd_Box is void": 5,
+        "skipped_syntax_error": 3,
+        "syntax_error:unexpected indent (<unknown>, line 3)": 2,
+        "skipped_unsupported_cut_context": 2,
+        "syntax_error:unexpected indent (<unknown>, line 2)": 1
+      }
+    }
+  },
+  "v4_hole_diagnostics": {
+    "overall": {
+      "hole_calls_total": 539,
+      "simple_loop_holes": 539,
+      "circular_cutout_via_cut_circle_extrude": 179,
+      "hole_parse_error_records": 3
+    },
+    "by_category": {
+      "Circles": {
+        "circular_cutout_via_cut_circle_extrude": 179,
+        "hole_calls_total": 154,
+        "simple_loop_holes": 154,
+        "hole_parse_error_records": 1
+      },
+      "Polygons": {
+        "hole_calls_total": 385,
+        "simple_loop_holes": 385,
+        "circular_cutout_via_cut_circle_extrude": 0
+      },
+      "Rects": {
+        "hole_parse_error_records": 2,
+        "circular_cutout_via_cut_circle_extrude": 0
+      }
+    }
+  },
+  "sample_seen_counts": {
+    "delete_chamfer": 129,
+    "delete_circular_cutout": 178,
+    "delete_fillet": 117,
+    "delete_hole": 218,
+    "delete_polygonal_cutout": 363
+  },
+  "sample_records_path": "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_v3_delete_expanded\\chunks\\chunk_02\\preview_samples.jsonl",
+  "render_gallery_path": "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_v3_delete_expanded\\chunks\\chunk_02\\preview_gallery\\index.html"
+}
+

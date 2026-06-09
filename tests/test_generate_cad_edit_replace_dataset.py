@@ -18,6 +18,12 @@ class GenerateCadEditReplaceDatasetTests(unittest.TestCase):
             'result = cq.Workplane("XY").box(80, 60, 20).faces(">Z").workplane().hole(12)'
         )
 
+    def candidate_by_type(self, candidates, edit_type):
+        for candidate in candidates:
+            if candidate["replace_candidate"]["edit_type"] == edit_type:
+                return candidate
+        self.fail(f"missing candidate type {edit_type}: {[c['replace_candidate']['edit_type'] for c in candidates]}")
+
     def test_generates_replace_hole_with_slot_candidate(self):
         record = {"images": ["a.png", "b.png", "c.png"], "original_code": self.sample_code()}
 
@@ -30,7 +36,7 @@ class GenerateCadEditReplaceDatasetTests(unittest.TestCase):
 
         self.assertEqual(stats["candidate_records"], 1, stats)
         self.assertEqual(len(candidates), 1)
-        candidate = candidates[0]
+        candidate = self.candidate_by_type(candidates, "replace_hole_with_slot")
         replace_candidate = candidate["replace_candidate"]
         self.assertEqual(replace_candidate["candidate_type"], "structural_replace")
         self.assertEqual(replace_candidate["edit_type"], "replace_hole_with_slot")
@@ -43,7 +49,7 @@ class GenerateCadEditReplaceDatasetTests(unittest.TestCase):
     def test_applies_and_validates_replace(self):
         record = {"images": ["a.png", "b.png", "c.png"], "original_code": self.sample_code()}
         candidates, _ = replace_dataset.generate_replace_candidates_for_record(record, 1, 1, 1)
-        candidate = candidates[0]
+        candidate = self.candidate_by_type(candidates, "replace_hole_with_slot")
 
         target_code = replace_dataset.apply_replace_candidate(candidate)
         report = replace_dataset.validate_replace_edit(candidate)
@@ -53,7 +59,7 @@ class GenerateCadEditReplaceDatasetTests(unittest.TestCase):
         self.assertGreater(report["delete_volume_delta"], 0)
         self.assertLess(report["slot_volume_delta"], 0)
 
-    def test_skips_batch_hole_delete_candidate_for_v1_replace_scope(self):
+    def test_replaces_simple_for_loop_holes_with_slot(self):
         code = (
             "import cadquery as cq\n"
             'result = cq.Workplane("XY").circle(39).extrude(27).faces(">Z").workplane()\n'
@@ -64,8 +70,105 @@ class GenerateCadEditReplaceDatasetTests(unittest.TestCase):
 
         candidates, stats = replace_dataset.generate_replace_candidates_for_record(record, 1, 1, 2)
 
-        self.assertEqual(candidates, [])
-        self.assertEqual(stats["skipped_batch_hole"], 1)
+        self.assertEqual(stats["candidate_records"], 1, stats)
+        self.assertEqual(len(candidates), 1)
+        candidate = self.candidate_by_type(candidates, "replace_loop_holes_with_slots")
+        self.assertEqual(candidate["replace_candidate"]["edit_type"], "replace_loop_holes_with_slots")
+        self.assertEqual(candidate["replace_candidate"]["old_feature"]["parameters"]["count"], 3)
+
+        report = replace_dataset.validate_replace_edit(candidate)
+        self.assertTrue(report["ok"], report)
+        self.assertGreater(report["delete_volume_delta"], 0)
+        self.assertLess(report["slot_volume_delta"], 0)
+
+    def test_replaces_circular_cutout_with_polygonal_cutout_and_slot(self):
+        code = (
+            "import cadquery as cq\n"
+            'result = cq.Workplane("XZ").moveTo(0, 0).circle(88).extrude(32)'
+            '.cut(cq.Workplane("XZ").circle(46).extrude(32))'
+        )
+        record = {"images": ["a.png", "b.png", "c.png"], "original_code": code}
+
+        candidates, stats = replace_dataset.generate_replace_candidates_for_record(record, 1, 1, 2)
+
+        self.assertEqual(stats["candidate_records"], 2, stats)
+        polygon_candidate = self.candidate_by_type(candidates, "replace_circular_cutout_with_polygonal_cutout")
+        self.assertEqual(polygon_candidate["replace_candidate"]["old_feature"]["edit_type"], "delete_circular_cutout")
+        self.assertIn(".polygon(6, 46)", polygon_candidate["target_code"])
+
+        report = replace_dataset.validate_replace_edit(polygon_candidate)
+        self.assertTrue(report["ok"], report)
+        self.assertEqual(report["validation_policy"], "cutout_replace")
+
+        candidate = self.candidate_by_type(candidates, "replace_circular_cutout_with_slot")
+        self.assertEqual(candidate["replace_candidate"]["old_feature"]["edit_type"], "delete_circular_cutout")
+
+        report = replace_dataset.validate_replace_edit(candidate)
+        self.assertTrue(report["ok"], report)
+        self.assertGreater(report["delete_volume_delta"], 0)
+        self.assertLess(report["slot_volume_delta"], 0)
+
+    def test_replaces_polygonal_cutout_with_circular_cutout_and_slot(self):
+        code = (
+            "import cadquery as cq\n"
+            'result = cq.Workplane("XZ").moveTo(0, 0).circle(88).extrude(32)'
+            '.cut(cq.Workplane("XZ").polygon(6, 30).extrude(32))'
+        )
+        record = {"images": ["a.png", "b.png", "c.png"], "original_code": code}
+
+        candidates, stats = replace_dataset.generate_replace_candidates_for_record(record, 1, 1, 2)
+
+        self.assertEqual(stats["candidate_records"], 2, stats)
+        circular_candidate = self.candidate_by_type(candidates, "replace_polygonal_cutout_with_circular_cutout")
+        self.assertEqual(circular_candidate["replace_candidate"]["old_feature"]["edit_type"], "delete_polygonal_cutout")
+        self.assertIn(".circle(", circular_candidate["target_code"])
+        self.assertEqual(circular_candidate["replace_candidate"]["new_feature"]["feature_type"], "circular_cutout")
+
+        report = replace_dataset.validate_replace_edit(circular_candidate)
+        self.assertTrue(report["ok"], report)
+        self.assertEqual(report["validation_policy"], "cutout_replace")
+
+        slot_candidate = self.candidate_by_type(candidates, "replace_polygonal_cutout_with_slot")
+        report = replace_dataset.validate_replace_edit(slot_candidate)
+        self.assertTrue(report["ok"], report)
+        self.assertGreater(report["delete_volume_delta"], 0)
+        self.assertLess(report["slot_volume_delta"], 0)
+
+    def test_replaces_chamfer_with_fillet(self):
+        code = (
+            "import cadquery as cq\n"
+            'result = cq.Workplane("XY").box(80, 60, 20).edges("|Z").chamfer(4)'
+        )
+        record = {"images": ["a.png", "b.png", "c.png"], "original_code": code}
+
+        candidates, stats = replace_dataset.generate_replace_candidates_for_record(record, 1, 1, 1)
+
+        self.assertEqual(stats["candidate_records"], 1, stats)
+        candidate = self.candidate_by_type(candidates, "replace_chamfer_with_fillet")
+        self.assertIn(".fillet(4)", candidate["target_code"])
+        self.assertNotIn(".chamfer(4)", candidate["target_code"])
+
+        report = replace_dataset.validate_replace_edit(candidate)
+        self.assertTrue(report["ok"], report)
+        self.assertEqual(report["validation_policy"], "finishing_replace")
+
+    def test_replaces_fillet_with_chamfer(self):
+        code = (
+            "import cadquery as cq\n"
+            'result = cq.Workplane("XY").box(80, 60, 20).edges("|Z").fillet(4)'
+        )
+        record = {"images": ["a.png", "b.png", "c.png"], "original_code": code}
+
+        candidates, stats = replace_dataset.generate_replace_candidates_for_record(record, 1, 1, 1)
+
+        self.assertEqual(stats["candidate_records"], 1, stats)
+        candidate = self.candidate_by_type(candidates, "replace_fillet_with_chamfer")
+        self.assertIn(".chamfer(4)", candidate["target_code"])
+        self.assertNotIn(".fillet(4)", candidate["target_code"])
+
+        report = replace_dataset.validate_replace_edit(candidate)
+        self.assertTrue(report["ok"], report)
+        self.assertEqual(report["validation_policy"], "finishing_replace")
 
     def test_final_record_matches_training_shape(self):
         validated = {

@@ -1,0 +1,223 @@
+{
+  "input_path": "data_expert3_fixed_paths.jsonl",
+  "input_records": 2500,
+  "start_index": 7501,
+  "limit": 2500,
+  "elapsed_seconds": 843.357,
+  "category_records": {
+    "Rects": 2500
+  },
+  "branches": {
+    "v1_parameter": {
+      "branch": "V1 parameter",
+      "candidates": 3696,
+      "validated": 3577,
+      "failed_validation": 119,
+      "pass_rate_percent": 96.7803,
+      "by_category": {
+        "Circles": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        },
+        "Polygons": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        },
+        "Rects": {
+          "candidates": 3696,
+          "validated": 3577,
+          "failed_validation": 119,
+          "pass_rate_percent": 96.7803
+        }
+      },
+      "by_edit_type": {
+        "chamfer": {
+          "candidates": 635,
+          "validated": 567,
+          "failed_validation": 68,
+          "pass_rate_percent": 89.2913
+        },
+        "extrude": {
+          "candidates": 2472,
+          "validated": 2470,
+          "failed_validation": 2,
+          "pass_rate_percent": 99.9191
+        },
+        "fillet": {
+          "candidates": 589,
+          "validated": 540,
+          "failed_validation": 49,
+          "pass_rate_percent": 91.6808
+        }
+      },
+      "top_rejection_reasons": {
+        "validation:StdFail_NotDone: BRep_API: command not done": 116,
+        "skipped_original_syntax_error": 20,
+        "skipped_no_candidates": 8,
+        "validation:result variable was not defined": 3
+      }
+    },
+    "v2_add": {
+      "branch": "V2 add",
+      "candidates": 9880,
+      "validated": 9880,
+      "failed_validation": 0,
+      "pass_rate_percent": 100.0,
+      "by_category": {
+        "Circles": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        },
+        "Polygons": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        },
+        "Rects": {
+          "candidates": 9880,
+          "validated": 9880,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        }
+      },
+      "by_edit_type": {
+        "add_blind_hole": {
+          "candidates": 2470,
+          "validated": 2470,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "add_pocket": {
+          "candidates": 2470,
+          "validated": 2470,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "add_rectangular_slot": {
+          "candidates": 2470,
+          "validated": 2470,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "add_through_hole": {
+          "candidates": 2470,
+          "validated": 2470,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        }
+      },
+      "top_rejection_reasons": {
+        "skipped_geometry_error": 30,
+        "geometry_error:unexpected indent (<cadquery_source>, line 3)": 18,
+        "geometry_error:result variable was not defined": 10,
+        "geometry_error:invalid syntax (<cadquery_source>, line 4)": 1,
+        "geometry_error:unexpected indent (<cadquery_source>, line 2)": 1
+      }
+    },
+    "v3_delete": {
+      "branch": "V3 delete",
+      "candidates": 0,
+      "validated": 0,
+      "failed_validation": 0,
+      "pass_rate_percent": 0.0,
+      "by_category": {
+        "Circles": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        },
+        "Polygons": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        },
+        "Rects": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        }
+      },
+      "by_edit_type": {},
+      "top_rejection_reasons": {
+        "skipped_no_delete_candidate": 2470,
+        "skipped_syntax_error": 20,
+        "syntax_error:unexpected indent (<unknown>, line 3)": 18,
+        "skipped_geometry_error": 10,
+        "geometry_error:result variable was not defined": 10,
+        "syntax_error:invalid syntax (<unknown>, line 4)": 1,
+        "syntax_error:unexpected indent (<unknown>, line 2)": 1
+      }
+    },
+    "v4_replace": {
+      "branch": "V4 replace",
+      "candidates": 0,
+      "validated": 0,
+      "failed_validation": 0,
+      "pass_rate_percent": 0.0,
+      "by_category": {
+        "Circles": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        },
+        "Polygons": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        },
+        "Rects": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        }
+      },
+      "by_edit_type": {},
+      "top_rejection_reasons": {
+        "skipped_no_replace_candidate": 2500,
+        "delete_skipped_no_delete_candidate": 2470,
+        "delete_skipped_syntax_error": 20,
+        "delete_syntax_error:unexpected indent (<unknown>, line 3)": 18,
+        "delete_skipped_geometry_error": 10,
+        "delete_geometry_error:result variable was not defined": 10,
+        "delete_syntax_error:invalid syntax (<unknown>, line 4)": 1,
+        "delete_syntax_error:unexpected indent (<unknown>, line 2)": 1
+      }
+    }
+  },
+  "v4_hole_diagnostics": {
+    "overall": {
+      "hole_parse_error_records": 20,
+      "circular_cutout_via_cut_circle_extrude": 0
+    },
+    "by_category": {
+      "Rects": {
+        "hole_parse_error_records": 20,
+        "circular_cutout_via_cut_circle_extrude": 0
+      }
+    }
+  },
+  "sample_seen_counts": {
+    "add_blind_hole": 2470,
+    "add_pocket": 2470,
+    "add_rectangular_slot": 2470,
+    "add_through_hole": 2470,
+    "chamfer": 567,
+    "extrude": 2470,
+    "fillet": 540
+  },
+  "sample_records_path": "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_04\\preview_samples.jsonl",
+  "render_gallery_path": "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_04\\preview_gallery\\index.html"
+}

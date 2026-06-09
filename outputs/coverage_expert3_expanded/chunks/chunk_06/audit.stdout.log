@@ -1,0 +1,303 @@
+{"processed": 500, "elapsed_seconds": 272.78, "v1_candidates": 868, "v2_candidates": 1980, "v3_candidates": 121, "v4_candidates": 18}
+{"processed": 1000, "elapsed_seconds": 618.46, "v1_candidates": 1797, "v2_candidates": 3960, "v3_candidates": 274, "v4_candidates": 76}
+{"processed": 1500, "elapsed_seconds": 921.1, "v1_candidates": 3051, "v2_candidates": 5848, "v3_candidates": 562, "v4_candidates": 364}
+{"processed": 2000, "elapsed_seconds": 1052.53, "v1_candidates": 3816, "v2_candidates": 7820, "v3_candidates": 572, "v4_candidates": 367}
+{
+  "input_path": "data_expert3_fixed_paths.jsonl",
+  "input_records": 2435,
+  "start_index": 12501,
+  "limit": 2435,
+  "elapsed_seconds": 1259.024,
+  "category_records": {
+    "Circles": 500,
+    "Polygons": 1435,
+    "Rects": 500
+  },
+  "branches": {
+    "v1_parameter": {
+      "branch": "V1 parameter",
+      "candidates": 4567,
+      "validated": 4488,
+      "failed_validation": 79,
+      "pass_rate_percent": 98.2702,
+      "by_category": {
+        "Circles": {
+          "candidates": 1318,
+          "validated": 1304,
+          "failed_validation": 14,
+          "pass_rate_percent": 98.9378
+        },
+        "Polygons": {
+          "candidates": 2493,
+          "validated": 2450,
+          "failed_validation": 43,
+          "pass_rate_percent": 98.2752
+        },
+        "Rects": {
+          "candidates": 756,
+          "validated": 734,
+          "failed_validation": 22,
+          "pass_rate_percent": 97.0899
+        }
+      },
+      "by_edit_type": {
+        "chamfer": {
+          "candidates": 127,
+          "validated": 112,
+          "failed_validation": 15,
+          "pass_rate_percent": 88.189
+        },
+        "circle": {
+          "candidates": 675,
+          "validated": 668,
+          "failed_validation": 7,
+          "pass_rate_percent": 98.963
+        },
+        "extrude": {
+          "candidates": 2775,
+          "validated": 2765,
+          "failed_validation": 10,
+          "pass_rate_percent": 99.6396
+        },
+        "fillet": {
+          "candidates": 484,
+          "validated": 437,
+          "failed_validation": 47,
+          "pass_rate_percent": 90.2893
+        },
+        "hole": {
+          "candidates": 506,
+          "validated": 506,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        }
+      },
+      "top_rejection_reasons": {
+        "validation:StdFail_NotDone: BRep_API: command not done": 62,
+        "validation:result variable was not defined": 17,
+        "skipped_original_syntax_error": 15,
+        "skipped_no_candidates": 1
+      }
+    },
+    "v2_add": {
+      "branch": "V2 add",
+      "candidates": 9560,
+      "validated": 9220,
+      "failed_validation": 340,
+      "pass_rate_percent": 96.4435,
+      "by_category": {
+        "Circles": {
+          "candidates": 1876,
+          "validated": 1876,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "Polygons": {
+          "candidates": 5712,
+          "validated": 5372,
+          "failed_validation": 340,
+          "pass_rate_percent": 94.0476
+        },
+        "Rects": {
+          "candidates": 1972,
+          "validated": 1972,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        }
+      },
+      "by_edit_type": {
+        "add_blind_hole": {
+          "candidates": 2390,
+          "validated": 2236,
+          "failed_validation": 154,
+          "pass_rate_percent": 93.5565
+        },
+        "add_pocket": {
+          "candidates": 2390,
+          "validated": 2349,
+          "failed_validation": 41,
+          "pass_rate_percent": 98.2845
+        },
+        "add_rectangular_slot": {
+          "candidates": 2390,
+          "validated": 2384,
+          "failed_validation": 6,
+          "pass_rate_percent": 99.749
+        },
+        "add_through_hole": {
+          "candidates": 2390,
+          "validated": 2251,
+          "failed_validation": 139,
+          "pass_rate_percent": 94.1841
+        }
+      },
+      "top_rejection_reasons": {
+        "validation:changed-region check failed: Bnd_Box is void": 339,
+        "skipped_bad_candidate_geometry": 76,
+        "skipped_geometry_error": 26,
+        "geometry_error:unexpected indent (<cadquery_source>, line 3)": 12,
+        "geometry_error:result variable was not defined": 11,
+        "geometry_error:unexpected indent (<cadquery_source>, line 2)": 2,
+        "validation:failed check: volume_direction_ok": 1,
+        "geometry_error:invalid syntax (<cadquery_source>, line 2)": 1
+      }
+    },
+    "v3_delete": {
+      "branch": "V3 delete",
+      "candidates": 680,
+      "validated": 384,
+      "failed_validation": 296,
+      "pass_rate_percent": 56.4706,
+      "by_category": {
+        "Circles": {
+          "candidates": 324,
+          "validated": 324,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "Polygons": {
+          "candidates": 356,
+          "validated": 60,
+          "failed_validation": 296,
+          "pass_rate_percent": 16.8539
+        },
+        "Rects": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        }
+      },
+      "by_edit_type": {
+        "delete_circular_cutout": {
+          "candidates": 178,
+          "validated": 178,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "delete_hole": {
+          "candidates": 502,
+          "validated": 206,
+          "failed_validation": 296,
+          "pass_rate_percent": 41.0359
+        }
+      },
+      "top_rejection_reasons": {
+        "skipped_no_delete_candidate": 1729,
+        "skipped_unsupported_hole_context": 506,
+        "skipped_unsupported_cut_context": 359,
+        "validation:failed check: bbox_stable": 259,
+        "validation:failed check: changed_region_not_global": 35,
+        "skipped_syntax_error": 15,
+        "syntax_error:unexpected indent (<unknown>, line 3)": 12,
+        "skipped_geometry_error": 11,
+        "geometry_error:result variable was not defined": 11,
+        "syntax_error:unexpected indent (<unknown>, line 2)": 2,
+        "validation:changed-region check failed: Bnd_Box is void": 2,
+        "syntax_error:invalid syntax (<unknown>, line 2)": 1
+      }
+    },
+    "v4_replace": {
+      "branch": "V4 replace",
+      "candidates": 384,
+      "validated": 377,
+      "failed_validation": 7,
+      "pass_rate_percent": 98.1771,
+      "by_category": {
+        "Circles": {
+          "candidates": 324,
+          "validated": 324,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "Polygons": {
+          "candidates": 60,
+          "validated": 53,
+          "failed_validation": 7,
+          "pass_rate_percent": 88.3333
+        },
+        "Rects": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        }
+      },
+      "by_edit_type": {
+        "replace_circular_cutout_with_slot": {
+          "candidates": 178,
+          "validated": 178,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "replace_loop_holes_with_slots": {
+          "candidates": 206,
+          "validated": 199,
+          "failed_validation": 7,
+          "pass_rate_percent": 96.6019
+        }
+      },
+      "top_rejection_reasons": {
+        "skipped_no_replace_candidate": 2051,
+        "delete_skipped_no_delete_candidate": 1729,
+        "delete_skipped_unsupported_hole_context": 506,
+        "delete_skipped_unsupported_cut_context": 359,
+        "skipped_delete_validation_failed": 296,
+        "delete_skipped_syntax_error": 15,
+        "delete_syntax_error:unexpected indent (<unknown>, line 3)": 12,
+        "delete_skipped_geometry_error": 11,
+        "delete_geometry_error:result variable was not defined": 11,
+        "validation:failed check: slot_changed_region_local": 7,
+        "delete_syntax_error:unexpected indent (<unknown>, line 2)": 2,
+        "delete_syntax_error:invalid syntax (<unknown>, line 2)": 1
+      }
+    }
+  },
+  "v4_hole_diagnostics": {
+    "overall": {
+      "hole_calls_total": 506,
+      "simple_loop_holes": 502,
+      "circular_cutout_via_cut_circle_extrude": 179,
+      "hole_parse_error_records": 15,
+      "other_unsupported_hole_contexts": 4
+    },
+    "by_category": {
+      "Circles": {
+        "circular_cutout_via_cut_circle_extrude": 179,
+        "hole_calls_total": 149,
+        "simple_loop_holes": 146,
+        "hole_parse_error_records": 6,
+        "other_unsupported_hole_contexts": 3
+      },
+      "Polygons": {
+        "hole_calls_total": 357,
+        "simple_loop_holes": 356,
+        "hole_parse_error_records": 3,
+        "other_unsupported_hole_contexts": 1,
+        "circular_cutout_via_cut_circle_extrude": 0
+      },
+      "Rects": {
+        "hole_parse_error_records": 6,
+        "circular_cutout_via_cut_circle_extrude": 0
+      }
+    }
+  },
+  "sample_seen_counts": {
+    "add_blind_hole": 2236,
+    "add_pocket": 2349,
+    "add_rectangular_slot": 2384,
+    "add_through_hole": 2251,
+    "chamfer": 112,
+    "circle": 668,
+    "delete_circular_cutout": 178,
+    "delete_hole": 206,
+    "extrude": 2765,
+    "fillet": 437,
+    "hole": 506,
+    "replace_circular_cutout_with_slot": 178,
+    "replace_loop_holes_with_slots": 199
+  },
+  "sample_records_path": "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_06\\preview_samples.jsonl",
+  "render_gallery_path": "C:\\Users\\13105\\Desktop\\AAAI\\outputs\\coverage_expert3_expanded\\chunks\\chunk_06\\preview_gallery\\index.html"
+}
+

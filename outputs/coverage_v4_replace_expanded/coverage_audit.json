@@ -1,0 +1,156 @@
+{
+  "input_path": "data_expert3_fixed_paths.jsonl",
+  "input_records": 14935,
+  "start_index": 1,
+  "limit": null,
+  "elapsed_seconds": 314.185,
+  "category_records": {
+    "Circles": 5000,
+    "Polygons": 4941,
+    "Rects": 4994
+  },
+  "branches": {
+    "v4_replace": {
+      "branch": "V4 replace",
+      "candidates": 9903,
+      "validated": 8012,
+      "failed_validation": 1891,
+      "pass_rate_percent": 80.9048,
+      "by_category": {
+        "Circles": {
+          "candidates": 4770,
+          "validated": 4770,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "Polygons": {
+          "candidates": 2660,
+          "validated": 769,
+          "failed_validation": 1891,
+          "pass_rate_percent": 28.9098
+        },
+        "Rects": {
+          "candidates": 2473,
+          "validated": 2473,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        }
+      },
+      "by_edit_type": {
+        "replace_chamfer_with_fillet": {
+          "candidates": 1260,
+          "validated": 1260,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "replace_circular_cutout_with_polygonal_cutout": {
+          "candidates": 1600,
+          "validated": 1600,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "replace_circular_cutout_with_slot": {
+          "candidates": 1600,
+          "validated": 1600,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "replace_fillet_with_chamfer": {
+          "candidates": 2396,
+          "validated": 1213,
+          "failed_validation": 1183,
+          "pass_rate_percent": 50.626
+        },
+        "replace_loop_holes_with_slots": {
+          "candidates": 1769,
+          "validated": 1749,
+          "failed_validation": 20,
+          "pass_rate_percent": 98.8694
+        },
+        "replace_polygonal_cutout_with_circular_cutout": {
+          "candidates": 1207,
+          "validated": 519,
+          "failed_validation": 688,
+          "pass_rate_percent": 42.9992
+        },
+        "replace_polygonal_cutout_with_slot": {
+          "candidates": 71,
+          "validated": 71,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        }
+      },
+      "top_rejection_reasons": {
+        "skipped_no_replace_candidate": 6703,
+        "delete_skipped_no_delete_candidate": 5455,
+        "delete_skipped_unsupported_hole_context": 2850,
+        "validation:failed check: bbox_stable": 1140,
+        "skipped_slot_geometry": 1136,
+        "skipped_delete_validation_failed": 1070,
+        "validation:failed check: new_feature_changed_region_local": 519,
+        "validation:Bnd_Box is void": 169,
+        "delete_skipped_syntax_error": 96,
+        "delete_skipped_geometry_error": 82,
+        "delete_geometry_error:result variable was not defined": 78,
+        "delete_syntax_error:unexpected indent (<unknown>, line 3)": 72,
+        "validation:BRep_API: command not done": 43,
+        "delete_skipped_unsupported_cut_context": 40,
+        "validation:failed check: slot_changed_region_local": 20,
+        "delete_syntax_error:unexpected indent (<unknown>, line 2)": 16,
+        "delete_syntax_error:invalid syntax (<unknown>, line 2)": 4,
+        "delete_geometry_error:Cannot cut type '<class 'ellipsis'>'": 3,
+        "delete_syntax_error:invalid syntax (<unknown>, line 4)": 2,
+        "delete_syntax_error:invalid syntax (<unknown>, line 3)": 2,
+        "delete_geometry_error:BRep_API: command not done": 1
+      }
+    }
+  },
+  "v4_hole_diagnostics": {
+    "overall": {
+      "hole_calls_total": 2850,
+      "simple_loop_holes": 2839,
+      "circular_cutout_via_cut_circle_extrude": 1607,
+      "hole_parse_error_records": 96,
+      "other_unsupported_hole_contexts": 11
+    },
+    "by_category": {
+      "Circles": {
+        "circular_cutout_via_cut_circle_extrude": 1607,
+        "hole_calls_total": 1579,
+        "simple_loop_holes": 1570,
+        "hole_parse_error_records": 40,
+        "other_unsupported_hole_contexts": 9
+      },
+      "Polygons": {
+        "hole_calls_total": 1271,
+        "simple_loop_holes": 1269,
+        "hole_parse_error_records": 22,
+        "other_unsupported_hole_contexts": 2,
+        "circular_cutout_via_cut_circle_extrude": 0
+      },
+      "Rects": {
+        "hole_parse_error_records": 34,
+        "circular_cutout_via_cut_circle_extrude": 0
+      }
+    }
+  },
+  "sample_seen_counts": {
+    "replace_chamfer_with_fillet": 20,
+    "replace_circular_cutout_with_polygonal_cutout": 18,
+    "replace_circular_cutout_with_slot": 18,
+    "replace_fillet_with_chamfer": 20,
+    "replace_loop_holes_with_slots": 23,
+    "replace_polygonal_cutout_with_circular_cutout": 12,
+    "replace_polygonal_cutout_with_slot": 12
+  },
+  "sample_records_path": "outputs\\coverage_v4_replace_expanded\\preview_samples.jsonl",
+  "render_gallery_path": "outputs\\coverage_v4_replace_expanded\\preview_gallery\\index.html",
+  "chunk_reports": [
+    "outputs\\coverage_v4_replace_expanded\\chunks\\chunk_00\\coverage_audit.json",
+    "outputs\\coverage_v4_replace_expanded\\chunks\\chunk_01\\coverage_audit.json",
+    "outputs\\coverage_v4_replace_expanded\\chunks\\chunk_02\\coverage_audit.json",
+    "outputs\\coverage_v4_replace_expanded\\chunks\\chunk_03\\coverage_audit.json",
+    "outputs\\coverage_v4_replace_expanded\\chunks\\chunk_04\\coverage_audit.json",
+    "outputs\\coverage_v4_replace_expanded\\chunks\\chunk_05\\coverage_audit.json"
+  ]
+}

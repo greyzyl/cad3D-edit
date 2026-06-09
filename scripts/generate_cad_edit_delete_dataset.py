@@ -39,6 +39,44 @@ REQUIRED_DELETE_CHECKS = (
     "volume_delta_matches_changed_region",
 )
 
+CUTOUT_DELETE_TYPES = {
+    "delete_hole",
+    "delete_circular_cutout",
+    "delete_polygonal_cutout",
+}
+FINISHING_DELETE_TYPES = {
+    "delete_fillet",
+    "delete_chamfer",
+}
+
+DELETE_TYPE_METADATA = {
+    "delete_hole": {
+        "human_feature_name": "圆孔",
+        "volume_effect": "increase",
+        "operation": "remove_subtractive_feature",
+    },
+    "delete_circular_cutout": {
+        "human_feature_name": "圆形切口",
+        "volume_effect": "increase",
+        "operation": "remove_subtractive_feature",
+    },
+    "delete_polygonal_cutout": {
+        "human_feature_name": "多边形通孔",
+        "volume_effect": "increase",
+        "operation": "remove_subtractive_feature",
+    },
+    "delete_fillet": {
+        "human_feature_name": "圆角",
+        "volume_effect": "change",
+        "operation": "remove_finishing_feature",
+    },
+    "delete_chamfer": {
+        "human_feature_name": "倒角",
+        "volume_effect": "change",
+        "operation": "remove_finishing_feature",
+    },
+}
+
 
 def line_offsets(source: str) -> list[int]:
     offsets = [0]
@@ -57,6 +95,22 @@ def is_hole_call(node: ast.AST) -> bool:
         isinstance(node, ast.Call)
         and isinstance(node.func, ast.Attribute)
         and node.func.attr == "hole"
+    )
+
+
+def is_cut_call(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "cut"
+    )
+
+
+def is_finishing_call(node: ast.AST, attr: str) -> bool:
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == attr
     )
 
 
@@ -106,6 +160,84 @@ def outer_result_hole_calls(tree: ast.AST) -> list[ast.Call]:
         if isinstance(node, ast.Assign) and assigned_to_result(node) and is_hole_call(node.value):
             calls.append(node.value)
         elif isinstance(node, ast.AnnAssign) and assigned_to_result(node) and is_hole_call(node.value):
+            calls.append(node.value)
+    return sorted(calls, key=lambda item: (item.lineno, item.col_offset))
+
+
+def outer_result_cut_calls(tree: ast.AST) -> list[ast.Call]:
+    calls: list[ast.Call] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and assigned_to_result(node) and is_cut_call(node.value):
+            calls.append(node.value)
+        elif isinstance(node, ast.AnnAssign) and assigned_to_result(node) and is_cut_call(node.value):
+            calls.append(node.value)
+    return sorted(calls, key=lambda item: (item.lineno, item.col_offset))
+
+
+def first_numeric_circle_call(node: ast.AST) -> tuple[ast.Call, float] | None:
+    for child in ast.walk(node):
+        if (
+            isinstance(child, ast.Call)
+            and isinstance(child.func, ast.Attribute)
+            and child.func.attr == "circle"
+            and child.args
+        ):
+            radius = numeric_literal_value(child.args[0])
+            if radius is not None and radius > 0:
+                return child, radius
+    return None
+
+
+def first_numeric_polygon_call(node: ast.AST) -> tuple[ast.Call, int, float] | None:
+    for child in ast.walk(node):
+        if (
+            isinstance(child, ast.Call)
+            and isinstance(child.func, ast.Attribute)
+            and child.func.attr == "polygon"
+            and len(child.args) >= 2
+        ):
+            sides_value = numeric_literal_value(child.args[0])
+            radius = numeric_literal_value(child.args[1])
+            if (
+                sides_value is not None
+                and radius is not None
+                and sides_value == int(sides_value)
+                and int(sides_value) >= 3
+                and radius > 0
+            ):
+                return child, int(sides_value), radius
+    return None
+
+
+def first_numeric_extrude_call(node: ast.AST) -> tuple[ast.Call, float] | None:
+    for child in ast.walk(node):
+        if (
+            isinstance(child, ast.Call)
+            and isinstance(child.func, ast.Attribute)
+            and child.func.attr == "extrude"
+            and child.args
+        ):
+            depth = numeric_literal_value(child.args[0])
+            if depth is not None and abs(depth) > 0:
+                return child, abs(depth)
+    return None
+
+
+def has_extrude_call(node: ast.AST) -> bool:
+    return any(
+        isinstance(child, ast.Call)
+        and isinstance(child.func, ast.Attribute)
+        and child.func.attr == "extrude"
+        for child in ast.walk(node)
+    )
+
+
+def outer_result_finishing_calls(tree: ast.AST, attr: str) -> list[ast.Call]:
+    calls: list[ast.Call] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and assigned_to_result(node) and is_finishing_call(node.value, attr):
+            calls.append(node.value)
+        elif isinstance(node, ast.AnnAssign) and assigned_to_result(node) and is_finishing_call(node.value, attr):
             calls.append(node.value)
     return sorted(calls, key=lambda item: (item.lineno, item.col_offset))
 
@@ -204,6 +336,111 @@ def locate_delete_block(source: str, node: ast.Call, offsets: list[int]) -> tupl
     return block_start, block_end, block_text
 
 
+def circular_cutout_parameters(node: ast.Call) -> dict[str, Any] | None:
+    if not node.args:
+        return None
+    cutter = node.args[0]
+    if not has_extrude_call(cutter):
+        return None
+    circle = first_numeric_circle_call(cutter)
+    if circle is None:
+        return None
+    _, radius = circle
+    return {
+        "radius": round_float(radius),
+        "diameter": round_float(radius * 2),
+    }
+
+
+def polygonal_cutout_parameters(node: ast.Call) -> dict[str, Any] | None:
+    if not node.args:
+        return None
+    cutter = node.args[0]
+    extrude = first_numeric_extrude_call(cutter)
+    if extrude is None:
+        return None
+    polygon = first_numeric_polygon_call(cutter)
+    if polygon is None:
+        return None
+    _, sides, radius = polygon
+    _, depth = extrude
+    return {
+        "sides": sides,
+        "radius": round_float(radius),
+        "depth": round_float(depth),
+    }
+
+
+def locate_circular_cutout_delete_block(source: str, node: ast.Call, offsets: list[int]) -> tuple[int, int, str] | None:
+    if node.end_lineno is None or node.end_col_offset is None:
+        return None
+    call_start = absolute_position(offsets, node.lineno, node.col_offset)
+    call_end = absolute_position(offsets, node.end_lineno, node.end_col_offset)
+    call_text = source[call_start:call_end]
+    cut_index = call_text.rfind(".cut(")
+    if cut_index < 0:
+        return None
+    block_start = call_start + cut_index
+    block_end = call_end
+    block_text = source[block_start:block_end]
+    if ".circle(" not in block_text or ".extrude(" not in block_text:
+        return None
+    return block_start, block_end, block_text
+
+
+def locate_polygonal_cutout_delete_block(source: str, node: ast.Call, offsets: list[int]) -> tuple[int, int, str] | None:
+    if node.end_lineno is None or node.end_col_offset is None:
+        return None
+    call_start = absolute_position(offsets, node.lineno, node.col_offset)
+    call_end = absolute_position(offsets, node.end_lineno, node.end_col_offset)
+    call_text = source[call_start:call_end]
+    cut_index = call_text.rfind(".cut(")
+    if cut_index < 0:
+        return None
+    block_start = call_start + cut_index
+    block_end = call_end
+    block_text = source[block_start:block_end]
+    if ".polygon(" not in block_text or ".extrude(" not in block_text:
+        return None
+    return block_start, block_end, block_text
+
+
+def finishing_parameters(node: ast.Call, attr: str) -> dict[str, Any] | None:
+    if not is_finishing_call(node, attr) or len(node.args) != 1 or node.keywords:
+        return None
+    value = numeric_literal_value(node.args[0])
+    if value is None or value <= 0:
+        return None
+    key = "radius" if attr == "fillet" else "distance"
+    return {key: round_float(value)}
+
+
+def locate_finishing_delete_block(
+    source: str,
+    node: ast.Call,
+    offsets: list[int],
+    attr: str,
+) -> tuple[int, int, str] | None:
+    if node.end_lineno is None or node.end_col_offset is None:
+        return None
+    call_start = absolute_position(offsets, node.lineno, node.col_offset)
+    call_end = absolute_position(offsets, node.end_lineno, node.end_col_offset)
+    call_text = source[call_start:call_end]
+    feature_index = call_text.rfind(f".{attr}(")
+    if feature_index < 0:
+        return None
+    prefix = call_text[:feature_index]
+    edges_index = prefix.rfind(".edges(")
+    if edges_index < 0:
+        return None
+    block_start = call_start + edges_index
+    block_end = call_end
+    block_text = source[block_start:block_end]
+    if ".edges(" not in block_text or f".{attr}(" not in block_text:
+        return None
+    return block_start, block_end, block_text
+
+
 def apply_delete_candidate(candidate: dict[str, Any]) -> str:
     delete_candidate = candidate["delete_candidate"]
     original_code = candidate["original_code"]
@@ -229,8 +466,39 @@ def build_delete_candidate(
     block_text: str,
     parameters: dict[str, Any],
     deletion_strategy: str = "chain_suffix",
+    edit_type: str = "delete_hole",
+    source_api: str = "hole",
 ) -> dict[str, Any]:
-    diameter = parameters["diameter"]
+    metadata = DELETE_TYPE_METADATA.get(edit_type, DELETE_TYPE_METADATA["delete_hole"])
+    human_feature_name = metadata["human_feature_name"]
+    if edit_type in {"delete_hole", "delete_circular_cutout"} and isinstance(parameters.get("diameter"), (int, float)):
+        instruction_template = f"删除零件上直径为 {parameters['diameter']} 的{human_feature_name}，其余结构保持不变。"
+    elif edit_type == "delete_polygonal_cutout":
+        sides = parameters.get("sides")
+        radius = parameters.get("radius")
+        if isinstance(sides, int) and isinstance(radius, (int, float)):
+            instruction_template = f"删除零件上半径为 {radius} 的 {sides} 边形通孔，其余结构保持不变。"
+        else:
+            instruction_template = "删除零件上的多边形通孔，其余结构保持不变。"
+    elif edit_type == "delete_fillet":
+        instruction_template = "删除零件边缘的圆角，使边缘恢复为直角，其余结构保持不变。"
+    elif edit_type == "delete_chamfer":
+        instruction_template = "删除零件边缘的倒角，使边缘恢复为直角，其余结构保持不变。"
+    else:
+        instruction_template = f"删除零件上的{human_feature_name}，其余结构保持不变。"
+    instruction_hints = {
+        "operation": "delete",
+        "human_feature_name": human_feature_name,
+        "delete_verbs": ["删除", "移除", "去掉"],
+        "preserve_other_geometry": True,
+        "preferred_position_style": "visual_surface_region",
+        "avoid_implementation_details": ["block_span", "source_api", "workplane", "origin"],
+    }
+    for key in ("diameter", "radius", "depth", "sides", "distance", "count"):
+        if key in parameters:
+            instruction_hints[key] = parameters[key]
+    if edit_type in FINISHING_DELETE_TYPES:
+        instruction_hints["restore_edge_style"] = "right_angle"
     return {
         "candidate_id": candidate_id,
         "sample_index": sample_index,
@@ -240,8 +508,8 @@ def build_delete_candidate(
         "original_geometry": original_geometry,
         "delete_candidate": {
             "candidate_type": "structural_delete",
-            "edit_type": "delete_hole",
-            "source_api": "hole",
+            "edit_type": edit_type,
+            "source_api": source_api,
             "block_span_start": block_start,
             "block_span_end": block_end,
             "block_text": block_text,
@@ -249,20 +517,12 @@ def build_delete_candidate(
             "parameters": parameters,
             "deletion_strategy": deletion_strategy,
             "expected_effect": {
-                "volume": "increase",
+                "volume": metadata["volume_effect"],
                 "bbox": "stable",
-                "operation": "remove_subtractive_feature",
+                "operation": metadata["operation"],
             },
-            "instruction_template": f"删除零件上直径为 {diameter} 的圆孔，其余结构保持不变。",
-            "instruction_hints": {
-                "operation": "delete",
-                "human_feature_name": "圆孔",
-                "diameter": diameter,
-                "delete_verbs": ["删除", "移除", "去掉"],
-                "preserve_other_geometry": True,
-                "preferred_position_style": "visual_surface_region",
-                "avoid_implementation_details": ["block_span", "source_api", "workplane", "origin"],
-            },
+            "instruction_template": instruction_template,
+            "instruction_hints": instruction_hints,
         },
     }
 
@@ -370,6 +630,92 @@ def generate_delete_candidates_for_record(
         stats["candidate_records"] += 1
         candidate_index += 1
 
+    for node in outer_result_cut_calls(tree):
+        if len(candidates) >= max_deletes_per_sample:
+            break
+        parameters = circular_cutout_parameters(node)
+        edit_type = "delete_circular_cutout"
+        source_api = "cut"
+        deletion_strategy = "circular_cutout_suffix"
+        block = locate_circular_cutout_delete_block(original_code, node, offsets) if parameters is not None else None
+        if parameters is None or block is None:
+            parameters = polygonal_cutout_parameters(node)
+            edit_type = "delete_polygonal_cutout"
+            source_api = "cut_polygon"
+            deletion_strategy = "polygonal_cutout_suffix"
+            block = locate_polygonal_cutout_delete_block(original_code, node, offsets) if parameters is not None else None
+        if parameters is None or block is None:
+            stats["skipped_unsupported_cut_context"] += 1
+            continue
+        block_start, block_end, block_text = block
+        candidate_id = f"v2del_{sample_index:06d}_{candidate_index:03d}"
+        candidate = build_delete_candidate(
+            candidate_id=candidate_id,
+            sample_index=sample_index,
+            source_line=source_line,
+            images=images,
+            original_code=original_code,
+            original_geometry=original_geometry,
+            block_start=block_start,
+            block_end=block_end,
+            block_text=block_text,
+            parameters=parameters,
+            deletion_strategy=deletion_strategy,
+            edit_type=edit_type,
+            source_api=source_api,
+        )
+        try:
+            apply_delete_candidate(candidate)
+        except Exception as exc:
+            stats["skipped_target_syntax_error"] += 1
+            stats[f"target_syntax_error:{str(exc)[:80]}"] += 1
+            continue
+        candidates.append(candidate)
+        stats["candidate_records"] += 1
+        candidate_index += 1
+
+    for attr, edit_type, source_api, deletion_strategy in (
+        ("fillet", "delete_fillet", "fillet", "finishing_fillet_suffix"),
+        ("chamfer", "delete_chamfer", "chamfer", "finishing_chamfer_suffix"),
+    ):
+        for node in outer_result_finishing_calls(tree, attr):
+            if len(candidates) >= max_deletes_per_sample:
+                break
+            parameters = finishing_parameters(node, attr)
+            if parameters is None:
+                stats[f"skipped_non_numeric_{attr}"] += 1
+                continue
+            block = locate_finishing_delete_block(original_code, node, offsets, attr)
+            if block is None:
+                stats[f"skipped_unsupported_{attr}_context"] += 1
+                continue
+            block_start, block_end, block_text = block
+            candidate_id = f"v2del_{sample_index:06d}_{candidate_index:03d}"
+            candidate = build_delete_candidate(
+                candidate_id=candidate_id,
+                sample_index=sample_index,
+                source_line=source_line,
+                images=images,
+                original_code=original_code,
+                original_geometry=original_geometry,
+                block_start=block_start,
+                block_end=block_end,
+                block_text=block_text,
+                parameters=parameters,
+                deletion_strategy=deletion_strategy,
+                edit_type=edit_type,
+                source_api=source_api,
+            )
+            try:
+                apply_delete_candidate(candidate)
+            except Exception as exc:
+                stats["skipped_target_syntax_error"] += 1
+                stats[f"target_syntax_error:{str(exc)[:80]}"] += 1
+                continue
+            candidates.append(candidate)
+            stats["candidate_records"] += 1
+            candidate_index += 1
+
     if not candidates:
         stats["skipped_no_delete_candidate"] += 1
     return candidates, stats
@@ -387,7 +733,7 @@ def bbox_not_global(changed_dims: dict[str, float], reference_dims: dict[str, fl
     return smaller_axes >= 2
 
 
-def validate_delete_edit(original_code: str, target_code: str, candidate: dict[str, Any]) -> dict[str, Any]:
+def validate_cutout_delete_edit(original_code: str, target_code: str, candidate: dict[str, Any]) -> dict[str, Any]:
     report: dict[str, Any] = {
         "ok": False,
         "mode": "cadquery_structural_delete",
@@ -446,16 +792,102 @@ def validate_delete_edit(original_code: str, target_code: str, candidate: dict[s
     return report
 
 
+def difference_volume(shape_a: Any, shape_b: Any) -> tuple[float, dict[str, float] | None]:
+    try:
+        diff_shape = shape_a.cut(shape_b)
+        diff_geometry = geometry_info(diff_shape)
+    except Exception:
+        return 0.0, None
+    if diff_geometry.volume <= 1e-6:
+        return 0.0, None
+    return diff_geometry.volume, diff_geometry.bbox
+
+
+def validate_finishing_delete_edit(original_code: str, target_code: str, candidate: dict[str, Any]) -> dict[str, Any]:
+    report: dict[str, Any] = {
+        "ok": False,
+        "mode": "cadquery_structural_delete",
+        "validation_policy": "finishing_feature_delete",
+        "checks": {},
+        "errors": [],
+    }
+    try:
+        original_shape = execute_shape(original_code)
+        edited_shape = execute_shape(target_code)
+        original_geometry = geometry_info(original_shape)
+        edited_geometry = geometry_info(edited_shape)
+        volume_delta = round_float(edited_geometry.volume - original_geometry.volume)
+        report.update(
+            {
+                "original_volume": original_geometry.volume,
+                "edited_volume": edited_geometry.volume,
+                "volume_delta": volume_delta,
+                "original_bbox": original_geometry.bbox,
+                "edited_bbox": edited_geometry.bbox,
+            }
+        )
+
+        checks = report["checks"]
+        checks["original_executes"] = original_geometry.volume > 1e-6
+        checks["edited_executes"] = edited_geometry.volume > 1e-6
+        checks["edited_non_empty"] = edited_geometry.volume > 1e-6
+        checks["bbox_stable"] = bbox_same(edited_geometry.bbox, original_geometry.bbox)
+        checks["bbox_not_collapsed"] = all(
+            edited_geometry.dims[axis] > max(original_geometry.dims[axis] * 0.5, 1e-6) for axis in AXES
+        )
+        checks["volume_changed_nontrivially"] = abs(volume_delta) > max(original_geometry.volume * 1e-7, 1e-4)
+
+        added_volume, added_bbox = difference_volume(edited_shape, original_shape)
+        removed_volume, removed_bbox = difference_volume(original_shape, edited_shape)
+        geometry_change_volume = round_float(added_volume + removed_volume)
+        report["geometry_change_volume"] = geometry_change_volume
+        if added_bbox is not None:
+            report["added_region_bbox"] = added_bbox
+            report["added_region_volume"] = round_float(added_volume)
+        if removed_bbox is not None:
+            report["removed_region_bbox"] = removed_bbox
+            report["removed_region_volume"] = round_float(removed_volume)
+        checks["geometry_changed_nontrivially"] = geometry_change_volume > max(original_geometry.volume * 1e-7, 1e-4)
+
+        failed = [name for name, value in checks.items() if not value]
+        if failed:
+            report["errors"].extend(f"failed check: {name}" for name in failed)
+        report["ok"] = not failed
+    except Exception as exc:
+        report["errors"].append(str(exc))
+    return report
+
+
+def validate_delete_edit(original_code: str, target_code: str, candidate: dict[str, Any]) -> dict[str, Any]:
+    delete_candidate = candidate.get("delete_candidate") if isinstance(candidate, dict) else None
+    edit_type = delete_candidate.get("edit_type") if isinstance(delete_candidate, dict) else None
+    if edit_type in FINISHING_DELETE_TYPES:
+        return validate_finishing_delete_edit(original_code, target_code, candidate)
+    return validate_cutout_delete_edit(original_code, target_code, candidate)
+
+
 def fallback_instruction(candidate: dict[str, Any]) -> str:
     delete_candidate = candidate["delete_candidate"]
     parameters = delete_candidate.get("parameters", {})
+    edit_type = delete_candidate.get("edit_type")
     diameter = parameters.get("diameter")
     count = parameters.get("count")
+    if edit_type == "delete_polygonal_cutout":
+        sides = parameters.get("sides")
+        radius = parameters.get("radius")
+        if isinstance(sides, int) and isinstance(radius, (int, float)):
+            return f"删除零件上半径为 {radius} 的 {sides} 边形通孔，其余结构保持不变。"
+        return "删除零件上的多边形通孔，其余结构保持不变。"
+    if edit_type == "delete_fillet":
+        return "删除零件边缘的圆角，使边缘恢复为直角，其余结构保持不变。"
+    if edit_type == "delete_chamfer":
+        return "删除零件边缘的倒角，使边缘恢复为直角，其余结构保持不变。"
+    feature_name = "圆形切口" if edit_type == "delete_circular_cutout" else "圆孔"
     if isinstance(diameter, (int, float)):
         if isinstance(count, int) and count > 1:
-            return f"删除零件上这一组共 {count} 个直径为 {diameter} 的圆孔，其余结构保持不变。"
-        return f"删除零件上直径为 {diameter} 的圆孔，其余结构保持不变。"
-    return "删除零件上的圆孔，其余结构保持不变。"
+            return f"删除零件上这一组共 {count} 个直径为 {diameter} 的{feature_name}，其余结构保持不变。"
+        return f"删除零件上直径为 {diameter} 的{feature_name}，其余结构保持不变。"
+    return f"删除零件上的{feature_name}，其余结构保持不变。"
 
 
 def final_record(validated: dict[str, Any], instruction_record: dict[str, Any] | None = None) -> dict[str, Any]:

@@ -1,0 +1,137 @@
+{
+  "input_path": "data_expert3_fixed_paths.jsonl",
+  "input_records": 14935,
+  "start_index": 1,
+  "limit": null,
+  "elapsed_seconds": 149.474,
+  "category_records": {
+    "Circles": 5000,
+    "Polygons": 4941,
+    "Rects": 4994
+  },
+  "branches": {
+    "v3_delete": {
+      "branch": "V3 delete",
+      "candidates": 9302,
+      "validated": 7049,
+      "failed_validation": 2253,
+      "pass_rate_percent": 75.7794,
+      "by_category": {
+        "Circles": {
+          "candidates": 3170,
+          "validated": 3170,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "Polygons": {
+          "candidates": 3659,
+          "validated": 1406,
+          "failed_validation": 2253,
+          "pass_rate_percent": 38.4258
+        },
+        "Rects": {
+          "candidates": 2473,
+          "validated": 2473,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        }
+      },
+      "by_edit_type": {
+        "delete_chamfer": {
+          "candidates": 1260,
+          "validated": 1260,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "delete_circular_cutout": {
+          "candidates": 1600,
+          "validated": 1600,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "delete_fillet": {
+          "candidates": 2396,
+          "validated": 1213,
+          "failed_validation": 1183,
+          "pass_rate_percent": 50.626
+        },
+        "delete_hole": {
+          "candidates": 2839,
+          "validated": 1769,
+          "failed_validation": 1070,
+          "pass_rate_percent": 62.3107
+        },
+        "delete_polygonal_cutout": {
+          "candidates": 1207,
+          "validated": 1207,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        }
+      },
+      "top_rejection_reasons": {
+        "skipped_no_delete_candidate": 5455,
+        "skipped_unsupported_hole_context": 2850,
+        "validation:failed check: bbox_stable": 2115,
+        "validation:failed check: changed_region_not_global": 121,
+        "skipped_syntax_error": 96,
+        "skipped_geometry_error": 82,
+        "geometry_error:result variable was not defined": 78,
+        "syntax_error:unexpected indent (<unknown>, line 3)": 72,
+        "skipped_unsupported_cut_context": 40,
+        "validation:changed-region check failed: Bnd_Box is void": 17,
+        "syntax_error:unexpected indent (<unknown>, line 2)": 16,
+        "syntax_error:invalid syntax (<unknown>, line 2)": 4,
+        "geometry_error:Cannot cut type '<class 'ellipsis'>'": 3,
+        "syntax_error:invalid syntax (<unknown>, line 4)": 2,
+        "syntax_error:invalid syntax (<unknown>, line 3)": 2,
+        "geometry_error:BRep_API: command not done": 1
+      }
+    }
+  },
+  "v4_hole_diagnostics": {
+    "overall": {
+      "hole_calls_total": 2850,
+      "simple_loop_holes": 2839,
+      "circular_cutout_via_cut_circle_extrude": 1607,
+      "hole_parse_error_records": 96,
+      "other_unsupported_hole_contexts": 11
+    },
+    "by_category": {
+      "Circles": {
+        "circular_cutout_via_cut_circle_extrude": 1607,
+        "hole_calls_total": 1579,
+        "simple_loop_holes": 1570,
+        "hole_parse_error_records": 40,
+        "other_unsupported_hole_contexts": 9
+      },
+      "Polygons": {
+        "hole_calls_total": 1271,
+        "simple_loop_holes": 1269,
+        "hole_parse_error_records": 22,
+        "other_unsupported_hole_contexts": 2,
+        "circular_cutout_via_cut_circle_extrude": 0
+      },
+      "Rects": {
+        "hole_parse_error_records": 34,
+        "circular_cutout_via_cut_circle_extrude": 0
+      }
+    }
+  },
+  "sample_seen_counts": {
+    "delete_chamfer": 24,
+    "delete_circular_cutout": 16,
+    "delete_fillet": 23,
+    "delete_hole": 20,
+    "delete_polygonal_cutout": 12
+  },
+  "sample_records_path": "outputs\\coverage_v3_delete_expanded\\preview_samples.jsonl",
+  "render_gallery_path": "outputs\\coverage_v3_delete_expanded\\preview_gallery\\index.html",
+  "chunk_reports": [
+    "outputs\\coverage_v3_delete_expanded\\chunks\\chunk_01\\coverage_audit.json",
+    "outputs\\coverage_v3_delete_expanded\\chunks\\chunk_02\\coverage_audit.json",
+    "outputs\\coverage_v3_delete_expanded\\chunks\\chunk_03\\coverage_audit.json",
+    "outputs\\coverage_v3_delete_expanded\\chunks\\chunk_04\\coverage_audit.json",
+    "outputs\\coverage_v3_delete_expanded\\chunks\\chunk_05\\coverage_audit.json",
+    "outputs\\coverage_v3_delete_expanded\\chunks\\chunk_06\\coverage_audit.json"
+  ]
+}

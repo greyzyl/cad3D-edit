@@ -87,6 +87,104 @@ class GenerateCadEditDeleteDatasetTests(unittest.TestCase):
         self.assertTrue(report["ok"], report)
         self.assertGreater(report["volume_delta"], 0)
 
+    def test_extracts_and_validates_circular_cutout_delete_candidate(self):
+        code = (
+            "import cadquery as cq\n"
+            'result = cq.Workplane("XZ").moveTo(0, 0).circle(88).extrude(32)'
+            '.cut(cq.Workplane("XZ").circle(46).extrude(32))'
+        )
+        record = {"images": ["a.png", "b.png", "c.png"], "original_code": code}
+
+        candidates, stats = delete_dataset.generate_delete_candidates_for_record(record, 1, 1, 2)
+
+        self.assertEqual(stats["candidate_records"], 1)
+        candidate = candidates[0]
+        delete_candidate = candidate["delete_candidate"]
+        self.assertEqual(delete_candidate["edit_type"], "delete_circular_cutout")
+        self.assertEqual(delete_candidate["source_api"], "cut")
+        self.assertEqual(delete_candidate["parameters"]["radius"], 46.0)
+        self.assertEqual(delete_candidate["parameters"]["diameter"], 92.0)
+        self.assertIn(".cut(", delete_candidate["block_text"])
+
+        target_code = delete_dataset.apply_delete_candidate(candidate)
+        report = delete_dataset.validate_delete_edit(code, target_code, candidate)
+        self.assertNotIn(".cut(", target_code)
+        self.assertTrue(report["ok"], report)
+        self.assertGreater(report["volume_delta"], 0)
+
+    def test_extracts_and_validates_polygonal_cutout_delete_candidate(self):
+        code = (
+            "import cadquery as cq\n"
+            'result = cq.Workplane("XZ").moveTo(0, 0).polygon(6, 80).extrude(32)'
+            '.cut(cq.Workplane("XZ").polygon(6, 30).extrude(32))'
+        )
+        record = {"images": ["a.png", "b.png", "c.png"], "original_code": code}
+
+        candidates, stats = delete_dataset.generate_delete_candidates_for_record(record, 1, 1, 2)
+
+        self.assertEqual(stats["candidate_records"], 1)
+        candidate = candidates[0]
+        delete_candidate = candidate["delete_candidate"]
+        self.assertEqual(delete_candidate["edit_type"], "delete_polygonal_cutout")
+        self.assertEqual(delete_candidate["source_api"], "cut_polygon")
+        self.assertEqual(delete_candidate["parameters"]["sides"], 6)
+        self.assertEqual(delete_candidate["parameters"]["radius"], 30.0)
+        self.assertEqual(delete_candidate["parameters"]["depth"], 32.0)
+
+        target_code = delete_dataset.apply_delete_candidate(candidate)
+        report = delete_dataset.validate_delete_edit(code, target_code, candidate)
+        self.assertNotIn(".cut(", target_code)
+        self.assertTrue(report["ok"], report)
+        self.assertGreater(report["volume_delta"], 0)
+
+    def test_extracts_and_validates_fillet_delete_candidate(self):
+        code = (
+            "import cadquery as cq\n"
+            'result = cq.Workplane("XY").moveTo(0, 0).rect(80, 60).extrude(20).edges("|Z").fillet(5)'
+        )
+        record = {"images": ["a.png", "b.png", "c.png"], "original_code": code}
+
+        candidates, stats = delete_dataset.generate_delete_candidates_for_record(record, 1, 1, 2)
+
+        self.assertEqual(stats["candidate_records"], 1)
+        candidate = candidates[0]
+        delete_candidate = candidate["delete_candidate"]
+        self.assertEqual(delete_candidate["edit_type"], "delete_fillet")
+        self.assertEqual(delete_candidate["source_api"], "fillet")
+        self.assertEqual(delete_candidate["parameters"]["radius"], 5.0)
+        self.assertEqual(delete_candidate["block_text"], '.edges("|Z").fillet(5)')
+
+        target_code = delete_dataset.apply_delete_candidate(candidate)
+        report = delete_dataset.validate_delete_edit(code, target_code, candidate)
+        self.assertNotIn(".fillet(", target_code)
+        self.assertTrue(report["ok"], report)
+        self.assertEqual(report["validation_policy"], "finishing_feature_delete")
+        self.assertTrue(report["checks"]["volume_changed_nontrivially"])
+
+    def test_extracts_and_validates_chamfer_delete_candidate(self):
+        code = (
+            "import cadquery as cq\n"
+            'result = cq.Workplane("XY").moveTo(0, 0).rect(80, 60).extrude(20).edges("|Z").chamfer(5)'
+        )
+        record = {"images": ["a.png", "b.png", "c.png"], "original_code": code}
+
+        candidates, stats = delete_dataset.generate_delete_candidates_for_record(record, 1, 1, 2)
+
+        self.assertEqual(stats["candidate_records"], 1)
+        candidate = candidates[0]
+        delete_candidate = candidate["delete_candidate"]
+        self.assertEqual(delete_candidate["edit_type"], "delete_chamfer")
+        self.assertEqual(delete_candidate["source_api"], "chamfer")
+        self.assertEqual(delete_candidate["parameters"]["distance"], 5.0)
+        self.assertEqual(delete_candidate["block_text"], '.edges("|Z").chamfer(5)')
+
+        target_code = delete_dataset.apply_delete_candidate(candidate)
+        report = delete_dataset.validate_delete_edit(code, target_code, candidate)
+        self.assertNotIn(".chamfer(", target_code)
+        self.assertTrue(report["ok"], report)
+        self.assertEqual(report["validation_policy"], "finishing_feature_delete")
+        self.assertTrue(report["checks"]["geometry_changed_nontrivially"])
+
     def test_final_record_matches_training_shape(self):
         validated = {
             "candidate_id": "v2del_000001_001",

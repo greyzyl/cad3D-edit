@@ -1,0 +1,44 @@
+﻿[
+    {
+        "chunk":  0,
+        "pid":  24708,
+        "start":  1,
+        "limit":  2500,
+        "dir":  "outputs\\coverage_expert3\\chunks\\chunk_00"
+    },
+    {
+        "chunk":  1,
+        "pid":  34924,
+        "start":  2501,
+        "limit":  2500,
+        "dir":  "outputs\\coverage_expert3\\chunks\\chunk_01"
+    },
+    {
+        "chunk":  2,
+        "pid":  40028,
+        "start":  5001,
+        "limit":  2500,
+        "dir":  "outputs\\coverage_expert3\\chunks\\chunk_02"
+    },
+    {
+        "chunk":  3,
+        "pid":  42740,
+        "start":  7501,
+        "limit":  2500,
+        "dir":  "outputs\\coverage_expert3\\chunks\\chunk_03"
+    },
+    {
+        "chunk":  4,
+        "pid":  41804,
+        "start":  10001,
+        "limit":  2500,
+        "dir":  "outputs\\coverage_expert3\\chunks\\chunk_04"
+    },
+    {
+        "chunk":  5,
+        "pid":  23080,
+        "start":  12501,
+        "limit":  2435,
+        "dir":  "outputs\\coverage_expert3\\chunks\\chunk_05"
+    }
+]

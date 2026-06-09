@@ -1,0 +1,98 @@
+{
+  "input_path": "data_expert3_fixed_paths.jsonl",
+  "input_records": 300,
+  "start_index": 3000,
+  "limit": 300,
+  "elapsed_seconds": 25.083,
+  "category_records": {
+    "Polygons": 300
+  },
+  "branches": {
+    "v4_replace": {
+      "branch": "V4 replace",
+      "candidates": 159,
+      "validated": 61,
+      "failed_validation": 98,
+      "pass_rate_percent": 38.3648,
+      "by_category": {
+        "Circles": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        },
+        "Polygons": {
+          "candidates": 159,
+          "validated": 61,
+          "failed_validation": 98,
+          "pass_rate_percent": 38.3648
+        },
+        "Rects": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        }
+      },
+      "by_edit_type": {
+        "replace_fillet_with_chamfer": {
+          "candidates": 63,
+          "validated": 0,
+          "failed_validation": 63,
+          "pass_rate_percent": 0.0
+        },
+        "replace_loop_holes_with_slots": {
+          "candidates": 12,
+          "validated": 11,
+          "failed_validation": 1,
+          "pass_rate_percent": 91.6667
+        },
+        "replace_polygonal_cutout_with_circular_cutout": {
+          "candidates": 80,
+          "validated": 46,
+          "failed_validation": 34,
+          "pass_rate_percent": 57.5
+        },
+        "replace_polygonal_cutout_with_slot": {
+          "candidates": 4,
+          "validated": 4,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        }
+      },
+      "top_rejection_reasons": {
+        "skipped_no_replace_candidate": 145,
+        "delete_skipped_no_delete_candidate": 86,
+        "skipped_slot_geometry": 76,
+        "delete_skipped_unsupported_hole_context": 71,
+        "skipped_delete_validation_failed": 59,
+        "validation:failed check: bbox_stable": 59,
+        "validation:failed check: new_feature_changed_region_local": 28,
+        "validation:Bnd_Box is void": 6,
+        "validation:BRep_API: command not done": 4,
+        "validation:failed check: slot_changed_region_local": 1
+      }
+    }
+  },
+  "v4_hole_diagnostics": {
+    "overall": {
+      "hole_calls_total": 71,
+      "simple_loop_holes": 71,
+      "circular_cutout_via_cut_circle_extrude": 0
+    },
+    "by_category": {
+      "Polygons": {
+        "hole_calls_total": 71,
+        "simple_loop_holes": 71,
+        "circular_cutout_via_cut_circle_extrude": 0
+      }
+    }
+  },
+  "sample_seen_counts": {
+    "replace_loop_holes_with_slots": 11,
+    "replace_polygonal_cutout_with_circular_cutout": 46,
+    "replace_polygonal_cutout_with_slot": 4
+  },
+  "sample_records_path": "outputs\\coverage_v4_replace_expanded_smoke_polygons\\preview_samples.jsonl",
+  "render_gallery_path": "outputs\\coverage_v4_replace_expanded_smoke_polygons\\preview_gallery\\index.html"
+}

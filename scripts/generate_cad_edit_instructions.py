@@ -23,7 +23,7 @@ FORBIDDEN_CODE_TOKENS = ("cadquery", "cq.", "workplane", "```", "result =", "tar
 FORBIDDEN_V1_COMPLEX_EDIT_TOKENS = ("新增", "添加", "删除", "移除", "移动", "旋转", "复制", "替换")
 FORBIDDEN_V2_ADD_UNSUPPORTED_EDIT_TOKENS = ("删除", "移除", "去掉", "填充", "移动", "旋转", "复制", "替换")
 FORBIDDEN_V2_DELETE_UNSUPPORTED_EDIT_TOKENS = ("新增", "添加", "开槽", "打孔", "移动", "旋转", "复制", "替换")
-REQUIRED_V2_DELETE_TOKENS = ("删除", "移除", "去掉", "填充")
+REQUIRED_V2_DELETE_TOKENS = ("删除", "移除", "去掉", "填充", "恢复")
 FORBIDDEN_V2_REPLACE_UNSUPPORTED_EDIT_TOKENS = ("新增", "添加", "删除无关", "移除无关", "去掉无关", "移动", "旋转", "复制")
 REQUIRED_V2_REPLACE_TOKENS = ("替换", "改成", "换成")
 FORBIDDEN_V2_IMPLEMENTATION_TOKENS = (
@@ -136,20 +136,60 @@ def fallback_structural_instruction(edit_record: dict[str, Any]) -> str:
         return "在零件主平面上添加一个矩形槽。"
     if edit_type == "add_pocket":
         return "在零件主平面上添加一个矩形凹陷。"
-    if edit_type == "delete_hole":
+    if edit_type in {"delete_hole", "delete_circular_cutout"}:
         parameters = edit_record.get("parameters")
+        feature_name = "圆形切口" if edit_type == "delete_circular_cutout" else "圆孔"
         if isinstance(parameters, dict) and isinstance(parameters.get("diameter"), (int, float)):
-            return f"删除零件上直径为 {parameters['diameter']} 的圆孔，其余结构保持不变。"
-        return "删除零件上的圆孔，其余结构保持不变。"
-    if edit_type == "replace_hole_with_slot":
+            return f"删除零件上直径为 {parameters['diameter']} 的{feature_name}，其余结构保持不变。"
+        return f"删除零件上的{feature_name}，其余结构保持不变。"
+    if edit_type == "delete_polygonal_cutout":
+        parameters = edit_record.get("parameters")
+        if isinstance(parameters, dict):
+            sides = parameters.get("sides")
+            radius = parameters.get("radius")
+            if isinstance(sides, int) and isinstance(radius, (int, float)):
+                return f"删除零件上半径为 {radius} 的 {sides} 边形通孔，其余结构保持不变。"
+        return "删除零件上的多边形通孔，其余结构保持不变。"
+    if edit_type == "delete_fillet":
+        return "删除零件边缘的圆角，使边缘恢复为直角，其余结构保持不变。"
+    if edit_type == "delete_chamfer":
+        return "删除零件边缘的倒角，使边缘恢复为直角，其余结构保持不变。"
+    if edit_type in {
+        "replace_hole_with_slot",
+        "replace_loop_holes_with_slots",
+        "replace_circular_cutout_with_slot",
+        "replace_polygonal_cutout_with_slot",
+    }:
         hints = edit_record.get("instruction_hints")
+        old_feature = "圆孔"
         if isinstance(hints, dict):
+            old_feature = str(hints.get("old_feature_name") or old_feature)
             diameter = hints.get("diameter")
             length = hints.get("length")
             width = hints.get("width")
             if all(isinstance(value, (int, float)) for value in (diameter, length, width)):
-                return f"将直径为 {diameter} 的圆孔替换为长度 {length}、宽度 {width} 的矩形槽，其余结构保持不变。"
-        return "将零件上的圆孔替换为矩形槽，其余结构保持不变。"
+                return f"将直径为 {diameter} 的{old_feature}替换为长度 {length}、宽度 {width} 的矩形槽，其余结构保持不变。"
+        return f"将零件上的{old_feature}替换为矩形槽，其余结构保持不变。"
+    if edit_type == "replace_circular_cutout_with_polygonal_cutout":
+        hints = edit_record.get("instruction_hints")
+        if isinstance(hints, dict) and isinstance(hints.get("radius"), (int, float)):
+            return f"将零件上半径为 {hints['radius']} 的圆形通孔替换为六边形通孔，其余结构保持不变。"
+        return "将零件上的圆形通孔替换为六边形通孔，其余结构保持不变。"
+    if edit_type == "replace_polygonal_cutout_with_circular_cutout":
+        hints = edit_record.get("instruction_hints")
+        if isinstance(hints, dict) and isinstance(hints.get("sides"), int):
+            return f"将零件上的 {hints['sides']} 边形通孔替换为圆形通孔，其余结构保持不变。"
+        return "将零件上的多边形通孔替换为圆形通孔，其余结构保持不变。"
+    if edit_type == "replace_chamfer_with_fillet":
+        hints = edit_record.get("instruction_hints")
+        if isinstance(hints, dict) and isinstance(hints.get("distance"), (int, float)) and isinstance(hints.get("radius"), (int, float)):
+            return f"将零件边缘尺寸为 C{hints['distance']} 的倒角替换为 R{hints['radius']} 的圆角，其余结构保持不变。"
+        return "将零件边缘的倒角替换为圆角，其余结构保持不变。"
+    if edit_type == "replace_fillet_with_chamfer":
+        hints = edit_record.get("instruction_hints")
+        if isinstance(hints, dict) and isinstance(hints.get("radius"), (int, float)) and isinstance(hints.get("distance"), (int, float)):
+            return f"将零件边缘半径为 R{hints['radius']} 的圆角替换为 C{hints['distance']} 的倒角，其余结构保持不变。"
+        return "将零件边缘的圆角替换为倒角，其余结构保持不变。"
     return "在零件主平面上添加一个局部结构。"
 
 
@@ -197,8 +237,8 @@ def build_prompt_text(record: dict[str, Any]) -> str:
         important_rules = [
             "只输出自然语言编辑指令，不要输出 CadQuery 代码。",
             "这是 V2 结构级 delete 编辑，必须忠实表达 edit_candidate 中的 edit_type、source_api、parameters 和 instruction_hints。",
-            "可以使用删除、移除、去掉、填充等人类 CAD 删除表达。",
-            "如果 edit_candidate 中包含 instruction_hints，优先使用 human_feature_name 和 diameter。",
+            "可以使用删除、移除、去掉、填充、恢复为直角等人类 CAD 删除表达。",
+            "如果 edit_candidate 中包含 instruction_hints，优先使用 human_feature_name、diameter、radius、sides、distance 等字段。",
             "必须表达其余结构保持不变，不要描述新增、添加、开槽、打孔或替换。",
             "不要照抄 block_span、source_api、Workplane、XY/XZ/YZ 平面、原点、坐标值等代码实现细节。",
             "如果位置无法从三视图稳定判断，就用零件上、主平面上、外表面上等保守表达，或者不描述精确位置。",
@@ -215,8 +255,8 @@ def build_prompt_text(record: dict[str, Any]) -> str:
             "只输出自然语言编辑指令，不要输出 CadQuery 代码。",
             "这是 V4 结构级 replace 编辑，必须忠实表达 edit_candidate 中的 edit_type、old_feature、new_feature 和 instruction_hints。",
             "只描述把旧结构替换成新结构；不要描述添加无关结构、删除无关结构、移动、旋转或复制。",
-            "可以使用替换、改成、换成、将圆孔替换为矩形槽等人类 CAD 编辑表达。",
-            "如果 instruction_hints 包含 diameter、length、width，可以自然地提到圆孔直径和矩形槽尺寸。",
+            "可以使用替换、改成、换成、将圆孔替换为矩形槽、将圆形通孔替换为六边形通孔、将倒角替换为圆角等人类 CAD 编辑表达。",
+            "如果 instruction_hints 包含 diameter、radius、sides、length、width、distance，可以自然地提到孔径、半径、边数、槽尺寸或倒角/圆角尺寸。",
             "必须表达其余结构保持不变。",
             "不要照抄 source span、block span、Workplane、CSG、cutter、坐标轴、原点或代码变量名等实现细节。",
             "如果位置无法从三视图稳定判断，就使用零件上、主平面上、外表面上等保守表达，或者不描述精确位置。",

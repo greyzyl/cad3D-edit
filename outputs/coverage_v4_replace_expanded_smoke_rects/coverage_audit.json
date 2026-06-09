@@ -1,0 +1,75 @@
+{
+  "input_path": "data_expert3_fixed_paths.jsonl",
+  "input_records": 300,
+  "start_index": 1503,
+  "limit": 300,
+  "elapsed_seconds": 16.167,
+  "category_records": {
+    "Rects": 300
+  },
+  "branches": {
+    "v4_replace": {
+      "branch": "V4 replace",
+      "candidates": 150,
+      "validated": 150,
+      "failed_validation": 0,
+      "pass_rate_percent": 100.0,
+      "by_category": {
+        "Circles": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        },
+        "Polygons": {
+          "candidates": 0,
+          "validated": 0,
+          "failed_validation": 0,
+          "pass_rate_percent": 0.0
+        },
+        "Rects": {
+          "candidates": 150,
+          "validated": 150,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        }
+      },
+      "by_edit_type": {
+        "replace_chamfer_with_fillet": {
+          "candidates": 72,
+          "validated": 72,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        },
+        "replace_fillet_with_chamfer": {
+          "candidates": 78,
+          "validated": 78,
+          "failed_validation": 0,
+          "pass_rate_percent": 100.0
+        }
+      },
+      "top_rejection_reasons": {
+        "skipped_no_replace_candidate": 150,
+        "delete_skipped_no_delete_candidate": 149,
+        "delete_skipped_geometry_error": 1,
+        "delete_geometry_error:result variable was not defined": 1
+      }
+    }
+  },
+  "v4_hole_diagnostics": {
+    "overall": {
+      "circular_cutout_via_cut_circle_extrude": 0
+    },
+    "by_category": {
+      "Rects": {
+        "circular_cutout_via_cut_circle_extrude": 0
+      }
+    }
+  },
+  "sample_seen_counts": {
+    "replace_chamfer_with_fillet": 72,
+    "replace_fillet_with_chamfer": 78
+  },
+  "sample_records_path": "outputs\\coverage_v4_replace_expanded_smoke_rects\\preview_samples.jsonl",
+  "render_gallery_path": "outputs\\coverage_v4_replace_expanded_smoke_rects\\preview_gallery\\index.html"
+}
