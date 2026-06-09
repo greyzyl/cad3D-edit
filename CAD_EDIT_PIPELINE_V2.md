@@ -7,10 +7,6 @@ V2 adds deterministic structural CAD edits on top of the existing V1 parameter-e
 - `add_rectangular_slot`
 - `add_pocket`
 
-The current deletion branch adds a conservative high-confidence first delete atom:
-
-- `delete_hole`
-
 The training task is still:
 
 ```text
@@ -179,81 +175,12 @@ outputs/cad_edit_v2_renders/index.html
 
 ## Scope
 
-Not implemented yet:
+Not implemented in V2:
 
+- structural deletion;
 - delete slot / pocket / boss;
 - replace hole with slot;
 - feature-level recovery from arbitrary original CadQuery chains;
 - boss / pad union edits.
 
-Deletion and replacement should only be added after the pipeline can reliably identify independent `.hole()`, `.cut()`, or feature blocks.
-
-## Delete Hole Branch
-
-The first deletion prototype is separate from the add-only generator and only handles high-confidence CadQuery `.hole(...)` blocks.
-
-Supported pattern:
-
-```python
-result = cq.Workplane("XY").box(80, 60, 20).faces(">Z").workplane().hole(10)
-```
-
-The delete candidate removes the whole feature block:
-
-```text
-.faces(">Z").workplane().hole(10)
-```
-
-Result:
-
-```python
-result = cq.Workplane("XY").box(80, 60, 20)
-```
-
-Skipped for now:
-
-- `.pushPoints(...).hole(...)`
-- arrayed holes
-- nested helper functions
-- non-numeric hole diameter
-- cases where deleting the block makes the code invalid or fails CadQuery validation
-
-Delete outputs:
-
-```text
-outputs/cad_edit_v2_delete_candidates.jsonl
-outputs/cad_edit_v2_validated_delete_edits.jsonl
-outputs/cad_edit_v2_delete_instructions.jsonl
-outputs/cad_edit_v2_delete.jsonl
-```
-
-Run:
-
-```powershell
-conda run -n cadedit-v1 python scripts/generate_cad_edit_delete_dataset.py --input data_t.jsonl --output outputs/cad_edit_v2_delete.jsonl
-```
-
-Audit:
-
-```powershell
-conda run -n cadedit-v1 python scripts/verify_cad_edit_delete_candidates.py --input outputs/cad_edit_v2_delete_candidates.jsonl
-conda run -n cadedit-v1 python scripts/verify_cad_edit_validated_delete_edits.py --input outputs/cad_edit_v2_validated_delete_edits.jsonl
-conda run -n cadedit-v1 python scripts/verify_cad_edit_dataset.py --input outputs/cad_edit_v2_delete.jsonl
-```
-
-MLLM instruction generation reuses the shared instruction script:
-
-```powershell
-conda run -n cadedit-v1 python scripts/generate_cad_edit_instructions.py --input outputs/cad_edit_v2_validated_delete_edits.jsonl --output outputs/cad_edit_v2_delete_instructions.jsonl --model qwen-vl-plus
-conda run -n cadedit-v1 python scripts/assemble_cad_edit_dataset.py --validated-input outputs/cad_edit_v2_validated_delete_edits.jsonl --instructions-input outputs/cad_edit_v2_delete_instructions.jsonl --output outputs/cad_edit_v2_delete.jsonl
-```
-
-Delete validation checks:
-
-- `P0` executes and yields non-empty geometry.
-- `P1` executes and yields non-empty geometry.
-- volume increases after deleting a subtractive hole.
-- bbox remains stable.
-- `edited_shape.cut(original_shape)` is non-empty.
-- changed-region bbox is not global.
-- changed-region volume roughly matches `volume_delta`.
+The high-confidence `delete_hole` branch is documented separately as [V3](CAD_EDIT_PIPELINE_V3.md).
