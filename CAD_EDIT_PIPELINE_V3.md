@@ -5,7 +5,8 @@ V3 adds a conservative structural deletion branch on top of V1 parameter edits a
 The current V3 scope is intentionally narrow:
 
 - implemented: `delete_hole`
-- not implemented: delete slot, delete pocket, delete boss, replace hole with slot, arbitrary geometric deletion
+- not implemented: delete slot, delete pocket, delete boss, arbitrary geometric deletion
+- implemented separately in V4: `replace_hole_with_slot`
 
 The training task remains:
 
@@ -21,6 +22,7 @@ output: edited executable CadQuery code after deleting the target structure
 - V1: parameter-level numeric edits.
 - V2: add-only structural edits through appended CSG blocks.
 - V3: high-confidence structural deletion through source code block deletion.
+- V4: high-confidence `replace_hole_with_slot` as delete + add.
 
 V3 does not rewrite V1/V2. It adds a separate deletion branch:
 
@@ -326,7 +328,7 @@ V3 is intentionally conservative. It does not yet support:
 - deleting arbitrary `.cut(...)` features;
 - deleting slots, pockets, bosses, or pads;
 - deleting arrayed holes created by `pushPoints`, `rarray`, or `polarArray`;
-- replacing holes with slots;
+- replacing holes with slots inside the V3 delete script;
 - generating edited three-view images.
 
-Replacement should be implemented later as delete + add after independent feature recovery is stable.
+The first replacement branch is documented separately as [V4](CAD_EDIT_PIPELINE_V4.md).

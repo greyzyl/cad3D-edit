@@ -1,0 +1,1 @@
+{"candidate_id": "v4rep_000001_001", "instruction": "将直径为 12.0 的圆孔替换为长度 26.4、宽度 9.0 的矩形槽，其余结构保持不变。", "instruction_meta": {"generator": "structural_replace_template", "fallback_used": true, "used_original_code": true, "used_candidate": true, "included_target_code": false, "instruction_mode": "structural_replace"}}

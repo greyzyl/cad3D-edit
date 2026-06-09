@@ -72,6 +72,9 @@ def build_final_record(
         "edit_record": validated["edit_record"],
         "validation_report": validated["validation_report"],
     }
+    intermediate_code = validated.get("intermediate_code")
+    if isinstance(intermediate_code, str) and intermediate_code.strip():
+        hidden["intermediate_code"] = intermediate_code
     if instruction_meta is not None:
         hidden["instruction_meta"] = instruction_meta
 

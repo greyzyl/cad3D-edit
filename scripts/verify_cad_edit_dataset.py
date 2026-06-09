@@ -32,6 +32,14 @@ V2_DELETE_EDIT_KEYS = (
     "expected_effect",
     "instruction_hints",
 )
+V2_REPLACE_EDIT_KEYS = (
+    "candidate_type",
+    "edit_type",
+    "old_feature",
+    "new_feature",
+    "insertion_strategy",
+    "instruction_hints",
+)
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -102,6 +110,21 @@ def validate_record(record: dict[str, Any], line_number: int) -> list[str]:
                 errors.append("hidden.edit_record.candidate_type must be structural_delete")
             if not isinstance(edit_record.get("parameters"), dict):
                 errors.append("hidden.edit_record.parameters must be an object")
+        elif is_v2_edit and (
+            edit_record.get("candidate_type") == "structural_replace"
+            or str(edit_record.get("edit_type", "")).startswith("replace_")
+        ):
+            for key in V2_REPLACE_EDIT_KEYS:
+                if key not in edit_record:
+                    errors.append(f"hidden.edit_record missing {key}")
+            if edit_record.get("candidate_type") != "structural_replace":
+                errors.append("hidden.edit_record.candidate_type must be structural_replace")
+            if not isinstance(edit_record.get("old_feature"), dict):
+                errors.append("hidden.edit_record.old_feature must be an object")
+            if not isinstance(edit_record.get("new_feature"), dict):
+                errors.append("hidden.edit_record.new_feature must be an object")
+            if edit_record.get("insertion_strategy", {}).get("append_csg_block") is not True:
+                errors.append("hidden.edit_record.insertion_strategy.append_csg_block must be true")
         elif is_v2_edit:
             for key in V2_EDIT_KEYS:
                 if key not in edit_record:

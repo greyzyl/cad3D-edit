@@ -24,7 +24,22 @@ FORBIDDEN_V1_COMPLEX_EDIT_TOKENS = ("新增", "添加", "删除", "移除", "移
 FORBIDDEN_V2_ADD_UNSUPPORTED_EDIT_TOKENS = ("删除", "移除", "去掉", "填充", "移动", "旋转", "复制", "替换")
 FORBIDDEN_V2_DELETE_UNSUPPORTED_EDIT_TOKENS = ("新增", "添加", "开槽", "打孔", "移动", "旋转", "复制", "替换")
 REQUIRED_V2_DELETE_TOKENS = ("删除", "移除", "去掉", "填充")
-FORBIDDEN_V2_IMPLEMENTATION_TOKENS = ("workplane", "工作平面", "原点", "xy", "xz", "yz")
+FORBIDDEN_V2_REPLACE_UNSUPPORTED_EDIT_TOKENS = ("新增", "添加", "删除无关", "移除无关", "去掉无关", "移动", "旋转", "复制")
+REQUIRED_V2_REPLACE_TOKENS = ("替换", "改成", "换成")
+FORBIDDEN_V2_IMPLEMENTATION_TOKENS = (
+    "workplane",
+    "工作平面",
+    "原点",
+    "xy",
+    "xz",
+    "yz",
+    "csg",
+    "cutter",
+    "source span",
+    "block span",
+    "source_span",
+    "block_span",
+)
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -100,6 +115,8 @@ def instruction_mode(record: dict[str, Any]) -> str:
         return "structural_delete"
     if edit_type.startswith("add_"):
         return "structural_add"
+    if edit_type.startswith("replace_"):
+        return "structural_replace"
     return "structural"
 
 
@@ -124,6 +141,15 @@ def fallback_structural_instruction(edit_record: dict[str, Any]) -> str:
         if isinstance(parameters, dict) and isinstance(parameters.get("diameter"), (int, float)):
             return f"删除零件上直径为 {parameters['diameter']} 的圆孔，其余结构保持不变。"
         return "删除零件上的圆孔，其余结构保持不变。"
+    if edit_type == "replace_hole_with_slot":
+        hints = edit_record.get("instruction_hints")
+        if isinstance(hints, dict):
+            diameter = hints.get("diameter")
+            length = hints.get("length")
+            width = hints.get("width")
+            if all(isinstance(value, (int, float)) for value in (diameter, length, width)):
+                return f"将直径为 {diameter} 的圆孔替换为长度 {length}、宽度 {width} 的矩形槽，其余结构保持不变。"
+        return "将零件上的圆孔替换为矩形槽，其余结构保持不变。"
     return "在零件主平面上添加一个局部结构。"
 
 
@@ -184,6 +210,24 @@ def build_prompt_text(record: dict[str, Any]) -> str:
             "confidence": "high|medium|low",
             "mentions_old_new_values": False,
         }
+    elif mode == "structural_replace":
+        important_rules = [
+            "只输出自然语言编辑指令，不要输出 CadQuery 代码。",
+            "这是 V4 结构级 replace 编辑，必须忠实表达 edit_candidate 中的 edit_type、old_feature、new_feature 和 instruction_hints。",
+            "只描述把旧结构替换成新结构；不要描述添加无关结构、删除无关结构、移动、旋转或复制。",
+            "可以使用替换、改成、换成、将圆孔替换为矩形槽等人类 CAD 编辑表达。",
+            "如果 instruction_hints 包含 diameter、length、width，可以自然地提到圆孔直径和矩形槽尺寸。",
+            "必须表达其余结构保持不变。",
+            "不要照抄 source span、block span、Workplane、CSG、cutter、坐标轴、原点或代码变量名等实现细节。",
+            "如果位置无法从三视图稳定判断，就使用零件上、主平面上、外表面上等保守表达，或者不描述精确位置。",
+            "修改后的目标代码已经通过验证，但不会提供给你。",
+        ]
+        task = "为 CAD 结构级替换数据生成自然语言指令"
+        output_schema = {
+            "instruction": "一句中文 CAD 结构替换指令",
+            "confidence": "high|medium|low",
+            "mentions_old_new_values": False,
+        }
     else:
         important_rules = [
             "只输出自然语言编辑指令，不要输出 CadQuery 代码。",
@@ -237,6 +281,8 @@ def build_messages(record: dict[str, Any], image_root: Path, allow_missing_image
     mode = instruction_mode(record)
     if mode == "structural_delete":
         system_content = "你是 CAD 数据集构造助手，负责把确定性的结构级删除编辑改写成人类自然编辑指令。"
+    elif mode == "structural_replace":
+        system_content = "你是 CAD 数据集构造助手，负责把确定性的结构级替换编辑改写成人类自然编辑指令。"
     elif mode == "structural_add":
         system_content = "你是 CAD 数据集构造助手，负责把确定性的结构级编辑改写成人类自然编辑指令。"
     else:
@@ -337,6 +383,11 @@ def validate_instruction(instruction: str, record: dict[str, Any], require_value
                 reasons.append("instruction mentions unsupported structural delete edit")
             if not any(token in instruction for token in REQUIRED_V2_DELETE_TOKENS):
                 reasons.append("instruction does not mention delete operation")
+        elif mode == "structural_replace":
+            if any(token in instruction for token in FORBIDDEN_V2_REPLACE_UNSUPPORTED_EDIT_TOKENS):
+                reasons.append("instruction mentions unsupported structural replace edit")
+            if not any(token in instruction for token in REQUIRED_V2_REPLACE_TOKENS):
+                reasons.append("instruction does not mention replace operation")
         elif any(token in instruction for token in FORBIDDEN_V2_ADD_UNSUPPORTED_EDIT_TOKENS):
             reasons.append("instruction mentions unsupported structural add edit")
         if any(token in normalized for token in FORBIDDEN_V2_IMPLEMENTATION_TOKENS):

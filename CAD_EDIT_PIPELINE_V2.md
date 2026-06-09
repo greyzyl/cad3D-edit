@@ -179,8 +179,9 @@ Not implemented in V2:
 
 - structural deletion;
 - delete slot / pocket / boss;
-- replace hole with slot;
+- replace hole with slot inside the V2 add script;
 - feature-level recovery from arbitrary original CadQuery chains;
 - boss / pad union edits.
 
 The high-confidence `delete_hole` branch is documented separately as [V3](CAD_EDIT_PIPELINE_V3.md).
+The first high-confidence replacement branch is documented separately as [V4](CAD_EDIT_PIPELINE_V4.md).

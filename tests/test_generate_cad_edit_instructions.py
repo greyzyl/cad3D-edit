@@ -90,6 +90,43 @@ class GenerateCadEditInstructionsTests(unittest.TestCase):
             "fallback_instruction": "删除零件上直径为 10.0 的圆孔，其余结构保持不变。",
         }
 
+    def structural_replace_record(self):
+        return {
+            "candidate_id": "v4rep_000001_001",
+            "images": ["a.png", "b.png", "c.png"],
+            "original_code": (
+                "import cadquery as cq\n"
+                'result = cq.Workplane("XY").box(80, 60, 20).faces(">Z").workplane().hole(12)'
+            ),
+            "target_code": 'import cadquery as cq\nresult = cq.Workplane("XY").box(80, 60, 20)\n# replacement\n',
+            "edit_candidate": {
+                "candidate_type": "structural_replace",
+                "edit_type": "replace_hole_with_slot",
+                "old_feature": {
+                    "candidate_type": "structural_delete",
+                    "edit_type": "delete_hole",
+                    "source_api": "hole",
+                    "parameters": {"diameter": 12.0},
+                },
+                "new_feature": {
+                    "feature": "rectangular_slot",
+                    "human_dimensions": {"length": 26.4, "width": 9.0},
+                },
+                "insertion_strategy": {"operation": "cut", "append_csg_block": True},
+                "instruction_hints": {
+                    "operation": "replace",
+                    "old_feature_name": "圆孔",
+                    "new_feature_name": "矩形槽",
+                    "diameter": 12.0,
+                    "length": 26.4,
+                    "width": 9.0,
+                    "preserve_other_geometry": True,
+                },
+            },
+            "validation_report": {"ok": True, "mode": "cadquery_structural_replace"},
+            "fallback_instruction": "将直径为 12.0 的圆孔替换为长度 26.4、宽度 9.0 的矩形槽，其余结构保持不变。",
+        }
+
     def test_prompt_excludes_target_code(self):
         prompt = instructions.build_prompt_text(self.sample_record())
 
@@ -151,6 +188,35 @@ class GenerateCadEditInstructionsTests(unittest.TestCase):
         ok, reasons = instructions.validate_instruction("让零件上直径为 10 的圆孔消失。", record, True)
         self.assertFalse(ok)
         self.assertIn("instruction does not mention delete operation", reasons)
+
+    def test_structural_replace_prompt_and_quality_checks(self):
+        record = self.structural_replace_record()
+        prompt = instructions.build_prompt_text(record)
+
+        self.assertIn("structural_replace", prompt)
+        self.assertIn("old_feature", prompt)
+        self.assertIn("new_feature", prompt)
+        self.assertNotIn("target_code", prompt)
+
+        ok, reasons = instructions.validate_instruction(
+            "将直径为 12 的圆孔替换为长度 26.4、宽度 9 的矩形槽，其余结构保持不变。",
+            record,
+            True,
+        )
+        self.assertTrue(ok)
+        self.assertEqual(reasons, [])
+
+        ok, reasons = instructions.validate_instruction("添加一个矩形槽。", record, True)
+        self.assertFalse(ok)
+        self.assertIn("instruction mentions unsupported structural replace edit", reasons)
+
+        ok, reasons = instructions.validate_instruction("将圆孔改为 CSG cutter。", record, True)
+        self.assertFalse(ok)
+        self.assertIn("instruction mentions implementation detail", reasons)
+
+        ok, reasons = instructions.validate_instruction("让圆孔变成长条形。", record, True)
+        self.assertFalse(ok)
+        self.assertIn("instruction does not mention replace operation", reasons)
 
 
 if __name__ == "__main__":
