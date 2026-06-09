@@ -21,6 +21,17 @@ V2_EDIT_KEYS = (
     "affected_region_bbox",
     "instruction_template",
 )
+V2_DELETE_EDIT_KEYS = (
+    "candidate_type",
+    "edit_type",
+    "source_api",
+    "block_span_start",
+    "block_span_end",
+    "block_text",
+    "parameters",
+    "expected_effect",
+    "instruction_hints",
+)
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -80,6 +91,17 @@ def validate_record(record: dict[str, Any], line_number: int) -> list[str]:
             for key in V1_EDIT_KEYS:
                 if key not in edit_record:
                     errors.append(f"hidden.edit_record missing {key}")
+        elif is_v2_edit and (
+            edit_record.get("candidate_type") == "structural_delete"
+            or str(edit_record.get("edit_type", "")).startswith("delete_")
+        ):
+            for key in V2_DELETE_EDIT_KEYS:
+                if key not in edit_record:
+                    errors.append(f"hidden.edit_record missing {key}")
+            if edit_record.get("candidate_type") != "structural_delete":
+                errors.append("hidden.edit_record.candidate_type must be structural_delete")
+            if not isinstance(edit_record.get("parameters"), dict):
+                errors.append("hidden.edit_record.parameters must be an object")
         elif is_v2_edit:
             for key in V2_EDIT_KEYS:
                 if key not in edit_record:

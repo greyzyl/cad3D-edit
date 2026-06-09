@@ -21,7 +21,9 @@ DEFAULT_MODEL = "qwen-vl-plus"
 DEFAULT_API_KEY_ENVS = ("DASHSCOPE_API_KEY", "BAILIAN_API_KEY")
 FORBIDDEN_CODE_TOKENS = ("cadquery", "cq.", "workplane", "```", "result =", "target_code")
 FORBIDDEN_V1_COMPLEX_EDIT_TOKENS = ("新增", "添加", "删除", "移除", "移动", "旋转", "复制", "替换")
-FORBIDDEN_V2_UNSUPPORTED_EDIT_TOKENS = ("删除", "移除", "移动", "旋转", "复制", "替换")
+FORBIDDEN_V2_ADD_UNSUPPORTED_EDIT_TOKENS = ("删除", "移除", "去掉", "填充", "移动", "旋转", "复制", "替换")
+FORBIDDEN_V2_DELETE_UNSUPPORTED_EDIT_TOKENS = ("新增", "添加", "开槽", "打孔", "移动", "旋转", "复制", "替换")
+REQUIRED_V2_DELETE_TOKENS = ("删除", "移除", "去掉", "填充")
 FORBIDDEN_V2_IMPLEMENTATION_TOKENS = ("workplane", "工作平面", "原点", "xy", "xz", "yz")
 
 
@@ -90,7 +92,15 @@ def is_structural_record(record: dict[str, Any]) -> bool:
 
 
 def instruction_mode(record: dict[str, Any]) -> str:
-    return "structural" if is_structural_record(record) else "parameter"
+    candidate = edit_candidate_from_record(record)
+    if not isinstance(candidate, dict) or not isinstance(candidate.get("edit_type"), str):
+        return "parameter"
+    edit_type = candidate["edit_type"]
+    if edit_type.startswith("delete_"):
+        return "structural_delete"
+    if edit_type.startswith("add_"):
+        return "structural_add"
+    return "structural"
 
 
 def fallback_structural_instruction(edit_record: dict[str, Any]) -> str:
@@ -109,6 +119,11 @@ def fallback_structural_instruction(edit_record: dict[str, Any]) -> str:
         return "在零件主平面上添加一个矩形槽。"
     if edit_type == "add_pocket":
         return "在零件主平面上添加一个矩形凹陷。"
+    if edit_type == "delete_hole":
+        parameters = edit_record.get("parameters")
+        if isinstance(parameters, dict) and isinstance(parameters.get("diameter"), (int, float)):
+            return f"删除零件上直径为 {parameters['diameter']} 的圆孔，其余结构保持不变。"
+        return "删除零件上的圆孔，其余结构保持不变。"
     return "在零件主平面上添加一个局部结构。"
 
 
@@ -132,7 +147,7 @@ def build_prompt_text(record: dict[str, Any]) -> str:
     edit_candidate = edit_candidate_from_record(record)
     validation_report = record.get("validation_report")
     mode = instruction_mode(record)
-    if mode == "structural":
+    if mode == "structural_add":
         important_rules = [
             "只输出自然语言编辑指令，不要输出 CadQuery 代码。",
             "这是 V2 结构级 add-only 编辑，必须忠实表达 edit_candidate 中的 edit_type、target_region 和 primitive。",
@@ -149,6 +164,23 @@ def build_prompt_text(record: dict[str, Any]) -> str:
         task = "为 CAD 结构级编辑数据生成自然语言指令"
         output_schema = {
             "instruction": "一句中文 CAD 结构编辑指令",
+            "confidence": "high|medium|low",
+            "mentions_old_new_values": False,
+        }
+    elif mode == "structural_delete":
+        important_rules = [
+            "只输出自然语言编辑指令，不要输出 CadQuery 代码。",
+            "这是 V2 结构级 delete 编辑，必须忠实表达 edit_candidate 中的 edit_type、source_api、parameters 和 instruction_hints。",
+            "可以使用删除、移除、去掉、填充等人类 CAD 删除表达。",
+            "如果 edit_candidate 中包含 instruction_hints，优先使用 human_feature_name 和 diameter。",
+            "必须表达其余结构保持不变，不要描述新增、添加、开槽、打孔或替换。",
+            "不要照抄 block_span、source_api、Workplane、XY/XZ/YZ 平面、原点、坐标值等代码实现细节。",
+            "如果位置无法从三视图稳定判断，就用零件上、主平面上、外表面上等保守表达，或者不描述精确位置。",
+            "修改后的目标代码已经通过验证，但不会提供给你。",
+        ]
+        task = "为 CAD 结构级删除数据生成自然语言指令"
+        output_schema = {
+            "instruction": "一句中文 CAD 结构删除指令",
             "confidence": "high|medium|low",
             "mentions_old_new_values": False,
         }
@@ -203,7 +235,9 @@ def build_messages(record: dict[str, Any], image_root: Path, allow_missing_image
             image_count += 1
 
     mode = instruction_mode(record)
-    if mode == "structural":
+    if mode == "structural_delete":
+        system_content = "你是 CAD 数据集构造助手，负责把确定性的结构级删除编辑改写成人类自然编辑指令。"
+    elif mode == "structural_add":
         system_content = "你是 CAD 数据集构造助手，负责把确定性的结构级编辑改写成人类自然编辑指令。"
     else:
         system_content = "你是 CAD 数据集构造助手，负责把确定性的参数编辑改写成人类自然编辑指令。"
@@ -297,8 +331,14 @@ def validate_instruction(instruction: str, record: dict[str, Any], require_value
     if any(token in normalized for token in FORBIDDEN_CODE_TOKENS):
         reasons.append("instruction contains code-like token")
     if structural:
-        if any(token in instruction for token in FORBIDDEN_V2_UNSUPPORTED_EDIT_TOKENS):
-            reasons.append("instruction mentions unsupported structural edit")
+        mode = instruction_mode(record)
+        if mode == "structural_delete":
+            if any(token in instruction for token in FORBIDDEN_V2_DELETE_UNSUPPORTED_EDIT_TOKENS):
+                reasons.append("instruction mentions unsupported structural delete edit")
+            if not any(token in instruction for token in REQUIRED_V2_DELETE_TOKENS):
+                reasons.append("instruction does not mention delete operation")
+        elif any(token in instruction for token in FORBIDDEN_V2_ADD_UNSUPPORTED_EDIT_TOKENS):
+            reasons.append("instruction mentions unsupported structural add edit")
         if any(token in normalized for token in FORBIDDEN_V2_IMPLEMENTATION_TOKENS):
             reasons.append("instruction mentions implementation detail")
     elif any(token in instruction for token in FORBIDDEN_V1_COMPLEX_EDIT_TOKENS):

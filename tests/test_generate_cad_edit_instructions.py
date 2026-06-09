@@ -61,6 +61,35 @@ class GenerateCadEditInstructionsTests(unittest.TestCase):
             "fallback_instruction": "在零件主平面上添加一个半径为 4.0 的贯穿圆孔。",
         }
 
+    def structural_delete_record(self):
+        return {
+            "candidate_id": "v2del_000001_001",
+            "images": ["a.png", "b.png", "c.png"],
+            "original_code": (
+                "import cadquery as cq\n"
+                'result = cq.Workplane("XY").box(80, 60, 20).faces(">Z").workplane().hole(10)'
+            ),
+            "target_code": 'import cadquery as cq\nresult = cq.Workplane("XY").box(80, 60, 20)',
+            "edit_candidate": {
+                "candidate_type": "structural_delete",
+                "edit_type": "delete_hole",
+                "source_api": "hole",
+                "block_span_start": 58,
+                "block_span_end": 91,
+                "block_text": '.faces(">Z").workplane().hole(10)',
+                "parameters": {"diameter": 10.0},
+                "expected_effect": {"volume": "increase", "bbox": "stable"},
+                "instruction_hints": {
+                    "operation": "delete",
+                    "human_feature_name": "圆孔",
+                    "diameter": 10.0,
+                    "preserve_other_geometry": True,
+                },
+            },
+            "validation_report": {"ok": True, "mode": "cadquery_structural_delete"},
+            "fallback_instruction": "删除零件上直径为 10.0 的圆孔，其余结构保持不变。",
+        }
+
     def test_prompt_excludes_target_code(self):
         prompt = instructions.build_prompt_text(self.sample_record())
 
@@ -96,11 +125,32 @@ class GenerateCadEditInstructionsTests(unittest.TestCase):
 
         ok, reasons = instructions.validate_instruction("删除主平面上的圆孔。", record, True)
         self.assertFalse(ok)
-        self.assertIn("instruction mentions unsupported structural edit", reasons)
+        self.assertIn("instruction mentions unsupported structural add edit", reasons)
 
         ok, reasons = instructions.validate_instruction("在XZ平面上距离原点57.2的位置添加盲孔。", record, True)
         self.assertFalse(ok)
         self.assertIn("instruction mentions implementation detail", reasons)
+
+    def test_structural_delete_prompt_and_quality_checks(self):
+        record = self.structural_delete_record()
+        prompt = instructions.build_prompt_text(record)
+
+        self.assertIn("structural_delete", prompt)
+        self.assertIn("可以使用删除", prompt)
+        self.assertIn("diameter", prompt)
+        self.assertNotIn("target_code", prompt)
+
+        ok, reasons = instructions.validate_instruction("删除零件上直径为 10 的圆孔，其余结构保持不变。", record, True)
+        self.assertTrue(ok)
+        self.assertEqual(reasons, [])
+
+        ok, reasons = instructions.validate_instruction("在零件上添加一个直径为 10 的圆孔。", record, True)
+        self.assertFalse(ok)
+        self.assertIn("instruction mentions unsupported structural delete edit", reasons)
+
+        ok, reasons = instructions.validate_instruction("让零件上直径为 10 的圆孔消失。", record, True)
+        self.assertFalse(ok)
+        self.assertIn("instruction does not mention delete operation", reasons)
 
 
 if __name__ == "__main__":
