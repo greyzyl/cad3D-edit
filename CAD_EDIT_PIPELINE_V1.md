@@ -1,318 +1,215 @@
 # CAD Edit Dataset Pipeline V1
 
-本项目构建一个面向“基于工程图的 CAD 编辑”的 V1 数据集生成 pipeline。
+V1 是 CAD 编辑数据构造系统中的参数级编辑分支。
 
-目标学习任务是：
-
-```text
-输入：
-  原始零件的带尺寸三视图 D0
-  自然语言编辑指令 I
-
-输出：
-  编辑后的可执行 CadQuery 代码 P1
-```
-
-数据构造阶段可以使用原始 CadQuery 代码 `P0`，但 `P0` 只作为隐藏监督和构造依据，不能作为模型推理输入。`P1` 必须由确定性规则从 `P0` 和 edit candidate 生成，不能由大模型生成。
-
-## 当前流程
-
-V1 采用四阶段流程：
+最终训练任务保持不变：
 
 ```text
-data_t.jsonl
-  |
-  v
-1. 抽取 P0，生成 edit candidates
-   -> outputs/cad_edit_v1_candidates.jsonl
-  |
-  v
-2. 确定性应用 candidate 得到 P1，并执行 CadQuery 验证
-   -> outputs/cad_edit_v1_validated_edits.jsonl
-  |
-  v
-3. 对验证通过的编辑调用百炼多模态模型生成自然语言 instruction
-   -> outputs/cad_edit_v1_instructions.jsonl
-  |
-  v
-4. 合并 validated_edits + instructions，生成最终训练数据
-   -> outputs/cad_edit_v1.jsonl
+input:
+  原始零件的带尺寸三视图
+  自然语言编辑指令
+
+output:
+  编辑后的可执行 CadQuery 代码
 ```
 
-MLLM instruction 阶段只接收：
+V1 只修改原始 CadQuery 代码中的高置信数值参数。`target_code` 必须由 `original_code` 通过确定性 source-span replacement 生成，不允许由大模型生成。
 
-- 原始三视图 `images`
-- 原始 CadQuery 代码 `P0`
-- `edit_candidate`
-- 验证通过摘要
+## 范围
 
-MLLM 默认不接收 `target_code` / `P1`，对应元数据为：
+V1 支持简单单参数编辑：
 
-```json
-{"included_target_code": false}
-```
+| edit_type | 目标 API | 语义 |
+|---|---|---|
+| `parameter_circle` | `.circle(r)` | 修改圆半径 |
+| `parameter_hole` | `.hole(d)` | 修改孔直径 |
+| `parameter_extrude` | `.extrude(depth)` | 修改拉伸深度 |
+| `parameter_box` | `.box(x, y, z)` | 修改 box 的单个尺寸 |
+| `parameter_chamfer` | `.chamfer(c)` | 修改倒角尺寸 |
+| `parameter_fillet` | `.fillet(r)` | 修改圆角半径 |
 
-## V1 支持的编辑
+当前 Expert3 Stage 1 输出中实际覆盖：
 
-当前只生成简单、高置信的单参数编辑：
+| edit_type | candidates | validated | pass rate |
+|---|---:|---:|---:|
+| `parameter_chamfer` | 1,260 | 1,122 | 89.05% |
+| `parameter_circle` | 6,547 | 6,402 | 97.79% |
+| `parameter_extrude` | 15,971 | 15,971 | 100.00% |
+| `parameter_fillet` | 2,396 | 2,171 | 90.61% |
+| `parameter_hole` | 2,850 | 2,845 | 99.82% |
 
-- `.circle(radius)`
-- `.hole(diameter)`
-- `.cboreHole(...)` 的第一个直径类参数
-- `.extrude(depth)`
-- `.box(length, width, height)` 的单个维度
-- `.chamfer(amount)`
-- `.fillet(radius)`
-
-默认编辑幅度是 `--scale-factor 1.5`，即把目标数值放大 50%，便于肉眼检查 before/after 差异。
-
-## 环境
-
-创建环境：
-
-```powershell
-conda env create -f environment.yml
-```
-
-如果环境已存在：
-
-```powershell
-conda env update -n cadedit-v1 -f environment.yml
-```
-
-验证 CadQuery：
-
-```powershell
-conda run -n cadedit-v1 python -c "import cadquery as cq; print(cq.__version__)"
-```
-
-## 一键运行
-
-完整 MLLM 流程：
-
-```powershell
-$env:DASHSCOPE_API_KEY = "<your Bailian/DashScope API key>"
-./scripts/run_cad_edit_pipeline.ps1 -UseMllmInstructions
-```
-
-不调用 API，只用 fallback 模板 instruction 验证链路：
-
-```powershell
-./scripts/run_cad_edit_pipeline.ps1 -DryRunInstructions
-```
-
-如果需要更新 conda 环境：
-
-```powershell
-./scripts/run_cad_edit_pipeline.ps1 -UpdateEnv
-```
-
-不要把 API key 写入代码、文档或 JSONL。只在 shell 环境变量中临时设置。
-
-## 分阶段运行
-
-阶段 1：生成 candidates 和 validated edits，不写最终训练数据：
-
-```powershell
-conda run -n cadedit-v1 python scripts/generate_cad_edit_dataset.py --input data_t.jsonl --output outputs/cad_edit_v1.jsonl --no-final-output
-conda run -n cadedit-v1 python scripts/verify_cad_edit_candidates.py --input outputs/cad_edit_v1_candidates.jsonl
-conda run -n cadedit-v1 python scripts/verify_cad_edit_validated_edits.py --input outputs/cad_edit_v1_validated_edits.jsonl
-```
-
-阶段 2：为验证通过的编辑生成 MLLM instruction：
-
-```powershell
-$env:DASHSCOPE_API_KEY = "<your Bailian/DashScope API key>"
-conda run -n cadedit-v1 python scripts/generate_cad_edit_instructions.py --input outputs/cad_edit_v1_validated_edits.jsonl --output outputs/cad_edit_v1_instructions.jsonl --model qwen-vl-plus
-conda run -n cadedit-v1 python scripts/verify_cad_edit_instructions.py --input outputs/cad_edit_v1_instructions.jsonl
-```
-
-阶段 3：组装最终训练数据：
-
-```powershell
-conda run -n cadedit-v1 python scripts/assemble_cad_edit_dataset.py --validated-input outputs/cad_edit_v1_validated_edits.jsonl --instructions-input outputs/cad_edit_v1_instructions.jsonl --output outputs/cad_edit_v1.jsonl
-conda run -n cadedit-v1 python scripts/verify_cad_edit_dataset.py --input outputs/cad_edit_v1.jsonl
-```
-
-阶段 4：渲染 before/after 预览：
-
-```powershell
-conda run -n cadedit-v1 python scripts/render_cad_edit_pairs.py --input outputs/cad_edit_v1.jsonl --output-dir outputs/cad_edit_v1_renders
-```
-
-打开：
+Stage 1 validated total:
 
 ```text
-outputs/cad_edit_v1_renders/index.html
+v1_parameter: 29,024 candidates / 28,511 validated
 ```
 
-## 产物说明
+Stage 1.5 capped subset keeps:
 
-### `outputs/cad_edit_v1_candidates.jsonl`
+```text
+v1_parameter: 10,000 selected records
+```
 
-P1 生成前的候选编辑中间产物。每条记录包含：
+## Deterministic Code Generation
 
-- `candidate_id`
-- `sample_index`
-- `source_line`
-- `images`
-- `original_code`
-- `edit_candidate`
+V1 uses Python AST and source spans to find high-confidence numeric arguments in CadQuery method calls.
 
-`edit_candidate` 包含精确源码定位：
+For each candidate:
+
+1. Parse `original_code`.
+2. Locate a numeric literal argument in a supported CadQuery call.
+3. Generate a deterministic new value using a stable scale factor.
+4. Replace only the exact numeric literal span.
+5. Keep all unrelated source text unchanged.
+
+The edit is one output row per parameter change.
+
+Example edit record:
 
 ```json
 {
   "kind": "circle",
   "call": "circle",
   "arg_index": 0,
-  "old": 88.0,
-  "new": 132.0,
-  "matched_text": "88",
-  "span_start": 70,
-  "span_end": 72,
-  "replacement": "132",
-  "scale_factor": 1.5
+  "old": 39.0,
+  "new": 58.5,
+  "matched_text": "39"
 }
 ```
 
-其中：
+## Validation
 
-```python
-original_code[span_start:span_end] == matched_text
-target_code = original_code[:span_start] + replacement + original_code[span_end:]
+V1 validation requires:
+
+- `original_code` parses and executes;
+- `target_code` parses and executes;
+- `result` exists after execution;
+- generated geometry is non-empty and valid;
+- source replacement only touches the selected numeric span;
+- no unrelated code rewrite occurs.
+
+Rejected samples stay out of Stage 1 validated outputs.
+
+## Stage 1 Output
+
+Canonical Stage 1 output:
+
+```text
+outputs/stage1/v1_parameter_validated.jsonl
 ```
 
-candidate 文件故意不包含 `target_code` 和 `validation_report`，用于在生成 P1 前审查“准备改哪里”。
-
-### `outputs/cad_edit_v1_validated_edits.jsonl`
-
-CadQuery 验证通过后的编辑中间产物。每条记录包含：
-
-- `candidate_id`
-- `images`
-- `original_code`
-- `edit_candidate`
-- `target_code`
-- `edit_record`
-- `validation_report`
-- `fallback_instruction`
-
-这个文件是 MLLM instruction 生成阶段的输入。脚本会读取 `target_code` 用于组装和追踪，但不会把它放进 MLLM prompt。
-
-### `outputs/cad_edit_v1_instructions.jsonl`
-
-MLLM 生成的自然语言指令文件，按 `candidate_id` 与 validated edits 对齐。每条记录包含：
-
-- `candidate_id`
-- `instruction`
-- `instruction_meta`
-
-`instruction_meta` 用于审计生成来源，例如：
+Each record is normalized into the shared intermediate schema:
 
 ```json
 {
-  "generator": "bailian_mllm",
-  "model": "qwen-vl-plus",
-  "used_images_count": 3,
-  "used_original_code": true,
-  "used_candidate": true,
-  "included_target_code": false,
-  "fallback_used": false
-}
-```
-
-如果 API 调用失败或 instruction 质量校验不通过，会回退到 `fallback_instruction`，并记录 `fallback_used: true`。
-
-### `outputs/cad_edit_v1.jsonl`
-
-最终训练数据。每条记录形如：
-
-```json
-{
-  "images": ["./image/Circles/3000_1.png", "./image/Circles/3000_2.png", "./image/Circles/3000_3.png"],
-  "instruction": "将外圆的半径从88修改为132",
-  "target_code": "import cadquery as cq\nresult = ...",
-  "hidden": {
-    "candidate_id": "000001_001",
-    "original_code": "import cadquery as cq\nresult = ...",
-    "edit_record": {
-      "kind": "circle",
-      "call": "circle",
-      "arg_index": 0,
-      "old": 88.0,
-      "new": 132.0,
-      "matched_text": "88"
-    },
-    "validation_report": {
-      "ok": true,
-      "mode": "cadquery"
-    },
-    "instruction_meta": {
-      "generator": "bailian_mllm",
-      "included_target_code": false
-    }
+  "sample_id": "...",
+  "source_sample_id": "...",
+  "images": ["front.png", "top.png", "left.png"],
+  "branch": "v1_parameter",
+  "edit_type": "parameter_circle",
+  "original_code": "...",
+  "target_code": "...",
+  "intermediate_code": null,
+  "edit_record": {},
+  "validation_report": {
+    "ok": true
+  },
+  "generation_meta": {
+    "pipeline_stage": "stage1_deterministic_generation",
+    "target_code_generated_by": "deterministic_rule",
+    "instruction_generated": false,
+    "mllm_used": false
   }
 }
 ```
 
-## 脚本职责
+## Stage 1.5 Selection
 
-| 脚本 | 作用 |
-| --- | --- |
-| `scripts/generate_cad_edit_dataset.py` | 抽取 `P0`，生成 candidates，确定性生成 `P1`，执行 CadQuery 验证，输出 candidates / validated edits |
-| `scripts/generate_cad_edit_instructions.py` | 调用百炼多模态模型，为 validated edits 生成自然语言 instruction |
-| `scripts/assemble_cad_edit_dataset.py` | 合并 validated edits 和 instructions，输出最终训练 JSONL |
-| `scripts/render_cad_edit_pairs.py` | 渲染 before/after SVG 和 STEP，并生成 HTML 对比页 |
-| `scripts/verify_cad_edit_candidates.py` | 审计 candidate JSONL |
-| `scripts/verify_cad_edit_validated_edits.py` | 审计 validated edits JSONL |
-| `scripts/verify_cad_edit_instructions.py` | 审计 instruction JSONL |
-| `scripts/verify_cad_edit_dataset.py` | 审计最终训练 JSONL |
-| `scripts/run_cad_edit_pipeline.ps1` | PowerShell 一键运行入口 |
+Stage 1.5 performs source-level split and balancing. It prevents the same original three-view drawing from appearing in multiple splits.
 
-## 验证命令
-
-运行全部单元测试：
-
-```powershell
-conda run -n cadedit-v1 python -m unittest discover -s tests
-```
-
-审计当前产物：
-
-```powershell
-conda run -n cadedit-v1 python scripts/verify_cad_edit_candidates.py --input outputs/cad_edit_v1_candidates.jsonl
-conda run -n cadedit-v1 python scripts/verify_cad_edit_validated_edits.py --input outputs/cad_edit_v1_validated_edits.jsonl
-conda run -n cadedit-v1 python scripts/verify_cad_edit_instructions.py --input outputs/cad_edit_v1_instructions.jsonl
-conda run -n cadedit-v1 python scripts/verify_cad_edit_dataset.py --input outputs/cad_edit_v1.jsonl
-```
-
-## 当前测试数据状态
-
-测试输入：
+Current capped dataset:
 
 ```text
-data_t.jsonl
+outputs/stage1_5/v1_10k_v2_12k/
 ```
 
-当前已生成：
+V1 selected distribution:
 
-- `outputs/cad_edit_v1_candidates.jsonl`
-- `outputs/cad_edit_v1_validated_edits.jsonl`
-- `outputs/cad_edit_v1_instructions.jsonl`
-- `outputs/cad_edit_v1.jsonl`
-- `outputs/cad_edit_v1_renders/index.html`
+| edit_type | selected |
+|---|---:|
+| `parameter_chamfer` | 1,122 |
+| `parameter_circle` | 2,236 |
+| `parameter_extrude` | 2,236 |
+| `parameter_fillet` | 2,171 |
+| `parameter_hole` | 2,235 |
 
-当前测试样本产生 3 条编辑：
+## Stage 2 Instruction Generation
 
-- 外圆半径 `88 -> 132`
-- 拉伸厚度 `32 -> 48`
-- 内圆半径 `46 -> 69`
+Stage 2 generates English natural-language instructions only. It does not generate or modify `target_code`.
 
-## 设计约束
+MLLM visible inputs:
 
-- `P1` 只能由确定性代码替换生成。
-- MLLM 只生成 instruction，不生成 `target_code`。
-- MLLM 默认不接收 `target_code`，避免目标泄漏。
-- 只有 CadQuery 验证通过的编辑才进入 MLLM instruction 阶段。
-- 任何阶段失败都应该保留可审计信息，并支持 fallback instruction。
+- original three-view images, ordered as Front, Top, Left;
+- hidden `original_code`, used only as construction context;
+- sanitized `edit_record`.
+
+MLLM never receives:
+
+- `target_code`;
+- `intermediate_code`;
+- source spans, block spans, CSG implementation details.
+
+V1 uses `parameter` instruction mode. Extra constraints:
+
+- old and new values from `edit_record` must appear exactly;
+- do not convert radius to diameter or diameter to radius;
+- do not describe add/delete/replace/move/rotate/copy;
+- instruction must say the rest of the part remains unchanged.
+
+Example:
+
+```text
+Change the main circle radius from 39 to 58.5, keeping the rest of the part unchanged.
+```
+
+## Recommended Stage 2 Command
+
+```powershell
+$env:DASHSCOPE_API_KEY="your_api_key"; python scripts\generate_stage2_instructions.py `
+  --input-dir outputs\stage1_5\v1_10k_v2_12k `
+  --output-dir outputs\stage2\v1_10k_v2_12k `
+  --model qwen3-vl-plus `
+  --image-root . `
+  --cache-dir outputs\stage2\cache `
+  --omit-template-reference `
+  --timeout-seconds 60 `
+  --retries 0 `
+  --workers 4
+```
+
+`--workers` controls concurrent MLLM calls. Start with `--workers 4`; increase only if the API does not rate-limit.
+
+If MLLM output fails validation, deterministic fallback is used. The final JSONL records:
+
+- `fallback_used`;
+- `quality_reasons`;
+- `fallback_reason_summary`;
+- rejected MLLM instruction when available.
+
+## Legacy Single-Branch Script
+
+The older V1-only script is still useful for smoke tests:
+
+```powershell
+conda run -n cadedit-v1 python scripts\generate_cad_edit_dataset.py `
+  --input data_t.jsonl `
+  --output outputs\cad_edit_v1.jsonl
+```
+
+For current dataset generation, prefer the Stage 1 / Stage 1.5 / Stage 2 pipeline.
+
+## Limitations
+
+- V1 does not add, delete, move, or replace structures.
+- V1 does not infer semantic intent from chain reasoning text in the source JSON.
+- It relies on high-confidence numeric literals; symbolic expressions and complex helper functions are skipped.

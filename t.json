@@ -1,0 +1,35 @@
+{
+    "sample_id": "v1_parameter_000001_002",
+    "source_sample_id": "cadexpert_line_000001",
+    "split": "train",
+    "branch": "v1_parameter",
+    "edit_type": "parameter_extrude",
+    "instruction": "将拉伸深度从 32 修改为 48，其余结构保持不变。",
+    "instruction_meta": {
+        "generator": "qwen3-vl-plus",
+        "model": "qwen3-vl-plus",
+        "instruction_mode": "parameter",
+        "fallback_used": false,
+        "validation_ok": true,
+        "quality_reasons": [],
+        "included_target_code": false,
+        "included_intermediate_code": false,
+        "used_original_code": true,
+        "used_edit_record": true,
+        "used_images_count": 3,
+        "raw_response_cached": true,
+        "usage": {
+            "prompt_tokens": 1598,
+            "completion_tokens": 31,
+            "total_tokens": 1629,
+            "completion_tokens_details": {
+                "text_tokens": 31
+            },
+            "prompt_tokens_details": {
+                "image_tokens": 978,
+                "text_tokens": 620,
+                "cached_tokens": 0
+            }
+        }
+    }
+}

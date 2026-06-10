@@ -46,4 +46,19 @@ For MLLM instruction generation, set the Bailian/DashScope API key in the shell 
 $env:DASHSCOPE_API_KEY = "<your api key>"
 ```
 
+Stage 2 uses the Bailian OpenAI-compatible chat completions endpoint with `qwen3-vl-plus` by default and requests structured JSON output via `response_format=json_schema`. It sends the original three-view images, hidden original CadQuery code, sanitized edit record, and validation summary to the MLLM; it never sends `target_code` or `intermediate_code`.
+
+```powershell
+conda run -n cadedit-v1 python scripts/generate_stage2_instructions.py `
+  --input-dir outputs/stage1_5/structural_balanced `
+  --output-dir outputs/stage2/structural_balanced `
+  --model qwen3-vl-plus `
+  --response-format json_schema `
+  --image-root . `
+  --cache-dir outputs/stage2/cache `
+  --seed 42
+```
+
+Use `--dry-run` to generate deterministic template fallback instructions without API calls.
+
 Do not commit API keys or full raw datasets.

@@ -1,1 +1,0 @@
-{"images":["./image/Circles/3000_1.png","./image/Circles/3000_2.png","./image/Circles/3000_3.png"],"hidden":{"original_code":"import cadquery as cq\nresult = cq.Workplane(\"XY\").box(80, 60, 20).faces(\">Z\").workplane().hole(12)"}}

@@ -31,8 +31,9 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
 def validate_record(record: dict[str, Any], line_number: int) -> list[str]:
     errors: list[str] = []
     candidate_id = record.get("candidate_id")
-    if not isinstance(candidate_id, str) or not candidate_id:
-        errors.append("candidate_id must be non-empty")
+    sample_id = record.get("sample_id")
+    if not isinstance(candidate_id, str) and not isinstance(sample_id, str):
+        errors.append("candidate_id or sample_id must be non-empty")
 
     instruction = record.get("instruction")
     if not isinstance(instruction, str) or not instruction.strip():
@@ -44,13 +45,16 @@ def validate_record(record: dict[str, Any], line_number: int) -> list[str]:
     else:
         if meta.get("included_target_code") is not False:
             errors.append("instruction_meta.included_target_code must be false")
-        if meta.get("used_candidate") is not True:
-            errors.append("instruction_meta.used_candidate must be true")
+        if meta.get("included_intermediate_code") not in (None, False):
+            errors.append("instruction_meta.included_intermediate_code must be false")
+        if meta.get("used_candidate") is not True and meta.get("used_edit_record") is not True:
+            errors.append("instruction_meta.used_candidate or used_edit_record must be true")
         if meta.get("used_original_code") is not True:
             errors.append("instruction_meta.used_original_code must be true")
 
-    if "target_code" in record:
-        errors.append("instruction record must not contain target_code")
+    for forbidden_key in ("target_code", "intermediate_code", "original_code", "edit_record", "validation_report"):
+        if forbidden_key in record:
+            errors.append(f"instruction record must not contain {forbidden_key}")
 
     return [f"line {line_number}: {error}" for error in errors]
 

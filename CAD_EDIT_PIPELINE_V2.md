@@ -1,187 +1,227 @@
 # CAD Edit Dataset Pipeline V2
 
-V2 adds deterministic structural CAD edits on top of the existing V1 parameter-edit pipeline. V1 remains unchanged. V2 focuses on add-only local structures in the first prototype:
+V2 is the structural add branch. It adds new local features to an existing CAD part while preserving the original V1 parameter-edit logic.
 
-- `add_through_hole`
-- `add_blind_hole`
-- `add_rectangular_slot`
-- `add_pocket`
-
-The training task is still:
+The target task remains:
 
 ```text
-input:  original dimensioned three-view drawings + natural-language edit instruction
+input:  original dimensioned three-view drawings + natural-language add instruction
 output: edited executable CadQuery code
 ```
 
-`P1` is generated from `P0` by deterministic CadQuery CSG rules. The MLLM is only used after validation to generate the natural-language instruction.
+`target_code` is generated deterministically. MLLM is used only later, after validation, to write the English instruction.
 
-## Flow
+## Scope
 
-```text
-data_t.jsonl
-  |
-  v
-1. Extract P0, execute P0, collect bbox / volume / axis-aligned exterior faces
-   -> outputs/cad_edit_v2_structural_candidates.jsonl
-  |
-  v
-2. Append an explicit CSG edit block to P0 and validate P1
-   -> outputs/cad_edit_v2_validated_structural_edits.jsonl
-  |
-  v
-3. Generate instruction after validation
-   -> outputs/cad_edit_v2_instructions.jsonl
-  |
-  v
-4. Assemble final training records
-   -> outputs/cad_edit_v2.jsonl
-```
+V2 is add-only. It does not delete or replace existing features.
 
-V2 candidates do not contain `target_code`. They describe the planned structural edit before `P1` is generated.
+Implemented edit types:
 
-## Run
+| edit_type | operation | implementation |
+|---|---|---|
+| `add_through_hole` | add circular through hole | append cutter + `result.cut(cutter)` |
+| `add_blind_hole` | add blind hole | append finite-depth cutter + `result.cut(cutter)` |
+| `add_rectangular_slot` | add rectangular slot | append box cutter + `result.cut(cutter)` |
+| `add_pocket` | add rectangular recess | append shallow box cutter + `result.cut(cutter)` |
 
-Generate candidates and validated edits:
+Stage 1 validated counts:
 
-```powershell
-conda run -n cadedit-v1 python scripts/generate_cad_edit_structural_dataset.py --input data_t.jsonl --output outputs/cad_edit_v2.jsonl --no-final-output
-```
+| edit_type | candidates | validated | pass rate |
+|---|---:|---:|---:|
+| `add_blind_hole` | 14,550 | 13,966 | 95.99% |
+| `add_pocket` | 14,550 | 14,388 | 98.89% |
+| `add_rectangular_slot` | 14,550 | 14,527 | 99.84% |
+| `add_through_hole` | 14,550 | 14,010 | 96.29% |
 
-Generate instructions without calling the MLLM:
-
-```powershell
-conda run -n cadedit-v1 python scripts/generate_cad_edit_instructions.py --input outputs/cad_edit_v2_validated_structural_edits.jsonl --output outputs/cad_edit_v2_instructions.jsonl --dry-run
-```
-
-Generate MLLM instructions:
-
-```powershell
-$env:DASHSCOPE_API_KEY = "<your Bailian/DashScope API key>"
-conda run -n cadedit-v1 python scripts/generate_cad_edit_instructions.py --input outputs/cad_edit_v2_validated_structural_edits.jsonl --output outputs/cad_edit_v2_instructions.jsonl --model qwen-vl-plus
-```
-
-Assemble final V2 data:
-
-```powershell
-conda run -n cadedit-v1 python scripts/assemble_cad_edit_dataset.py --validated-input outputs/cad_edit_v2_validated_structural_edits.jsonl --instructions-input outputs/cad_edit_v2_instructions.jsonl --output outputs/cad_edit_v2.jsonl
-```
-
-Audit and render:
-
-```powershell
-conda run -n cadedit-v1 python scripts/verify_cad_edit_structural_candidates.py --input outputs/cad_edit_v2_structural_candidates.jsonl
-conda run -n cadedit-v1 python scripts/verify_cad_edit_validated_structural_edits.py --input outputs/cad_edit_v2_validated_structural_edits.jsonl
-conda run -n cadedit-v1 python scripts/verify_cad_edit_dataset.py --input outputs/cad_edit_v2.jsonl
-conda run -n cadedit-v1 python scripts/render_cad_edit_pairs.py --input outputs/cad_edit_v2.jsonl --output-dir outputs/cad_edit_v2_renders
-```
-
-Open:
+Stage 1 validated total:
 
 ```text
-outputs/cad_edit_v2_renders/index.html
+v2_add: 58,200 candidates / 56,891 validated
 ```
 
-## Candidate Record
+Stage 1.5 capped subset keeps:
 
-Each V2 candidate includes:
+```text
+v2_add: 12,000 selected records
+```
+
+## Candidate Representation
+
+V2 candidates describe the structure to add before `target_code` is generated.
+
+Required concepts:
+
+- `candidate_type: structural_add`;
+- `edit_type`;
+- target feature primitive;
+- target region or high-confidence face;
+- insertion strategy;
+- affected region estimate;
+- instruction hints.
+
+Example:
 
 ```json
 {
-  "candidate_id": "v2_000001_001",
-  "images": ["./image/Circles/3000_1.png", "./image/Circles/3000_2.png", "./image/Circles/3000_3.png"],
-  "original_code": "import cadquery as cq\nresult = ...",
-  "original_geometry": {
-    "volume": 651395.3464,
-    "bbox": {"xmin": -88.0, "xmax": 88.0, "ymin": -32.0, "ymax": 0.0, "zmin": -88.0, "zmax": 88.0},
-    "dims": {"x": 176.0, "y": 32.0, "z": 176.0}
+  "candidate_type": "structural_add",
+  "edit_type": "add_pocket",
+  "primitive": {
+    "feature_type": "rectangular_pocket",
+    "length": 38.72,
+    "width": 21.12,
+    "depth": 14.08
   },
-  "structural_candidate": {
-    "edit_type": "add_through_hole",
-    "target_region": {"region_type": "axis_aligned_exterior_face", "axis": "y", "side": "+"},
-    "primitive": {"kind": "cylinder", "radius": 10.56, "depth": 60.16, "axis": "y"},
-    "insertion_strategy": {"operation": "cut", "append_csg_block": true},
-    "affected_region_bbox": {"xmin": 46.64, "xmax": 67.76, "ymin": -46.08, "ymax": 14.08, "zmin": -10.56, "zmax": 10.56},
-    "instruction_template": "在零件主平面上添加一个贯穿圆孔。",
-    "instruction_hints": {
-      "human_feature_name": "贯穿圆孔",
-      "diameter": 21.12,
-      "radius": 10.56,
-      "through": true,
-      "do_not_mention_depth": true
-    }
+  "insertion_strategy": {
+    "operation": "append_csg_cut"
+  },
+  "instruction_hints": {
+    "human_feature_name": "rectangular pocket",
+    "length": 38.72,
+    "width": 21.12,
+    "depth": 14.08
   }
 }
 ```
 
-`instruction_hints` is the preferred MLLM-facing edit summary. It separates human-visible feature dimensions from CSG implementation details such as cutter depth, workplane origin, and extrusion margin.
+## Deterministic Code Generation
 
-## Code Generation
+V2 does not insert code into the middle of the original CadQuery chain. It appends an explicit CSG block after `original_code`.
 
-V2 does not insert edits into the middle of the original CadQuery chain. It appends a CSG block at the end:
+Simplified pattern:
 
 ```python
-# V2 structural edit: add_through_hole (v2_000001_001)
-v2_cutter = cq.Workplane("XZ", origin=(57.2, 14.08, 0.0)).circle(10.56).extrude(60.16)
-result = result.cut(v2_cutter)
+# V2 structural edit: add_pocket
+cutter = ...
+result = result.cut(cutter)
 ```
 
-Subtractive edits use `result.cut(v2_cutter)`. Future additive edits such as boss / pad should use `result.union(primitive)`.
+This keeps edits auditable and avoids fragile chain surgery.
+
+## Geometry Placement
+
+V2 first executes `P0` and extracts geometric context:
+
+- volume;
+- bounding box;
+- high-confidence exterior planes;
+- safe margins.
+
+Candidate placement prefers:
+
+- large exterior faces;
+- axis-aligned normals;
+- sufficient margin from the boundary;
+- feature size small enough to avoid global geometry damage.
+
+Low-confidence placements are skipped.
 
 ## Validation
 
-The structural validator requires:
+V2 validation requires:
 
-- `P0` executes and yields non-empty geometry.
-- `P1` executes and yields non-empty geometry.
-- subtractive edits reduce volume.
-- bbox does not collapse or grow unexpectedly.
-- changed-region bbox is inside the candidate `affected_region_bbox` after a small tolerance expansion.
-- volume removed by CSG roughly matches the reported volume delta.
+- `P0` executes;
+- `P1` executes;
+- `P1` is non-empty and valid;
+- volume direction is consistent with subtractive add features;
+- bbox does not collapse or explode;
+- changed region is local;
+- non-target geometry is preserved as much as practical.
 
-Failed edits are skipped by default.
+V2 rejects samples when the changed region is invalid or global.
 
-## Instruction Generation
+## Stage 1 Output
 
-The shared instruction generator now detects `instruction_mode`:
-
-- V1 parameter edits require old/new values and forbid新增、删除、移动、替换等 complex operation words.
-- V2 structural edits allow expressions like添加孔、开槽、添加凹陷, but still reject unsupported delete / move / rotate / replace wording in this add-only prototype.
-
-The MLLM prompt receives:
-
-- original three-view images;
-- original CadQuery `P0`;
-- structural candidate;
-- `instruction_hints` for human-facing feature wording;
-- validation summary.
-
-It does not receive `target_code`.
-
-## Current Smoke Result
-
-On `data_t.jsonl`, the V2 prototype currently produces 4 validated records:
-
-- `add_through_hole`: 1
-- `add_blind_hole`: 1
-- `add_rectangular_slot`: 1
-- `add_pocket`: 1
-
-Preview output:
+Canonical Stage 1 output:
 
 ```text
-outputs/cad_edit_v2_renders/index.html
+outputs/stage1/v2_add_validated.jsonl
 ```
 
-## Scope
+Records use the shared intermediate schema:
 
-Not implemented in V2:
+```json
+{
+  "branch": "v2_add",
+  "edit_type": "add_rectangular_slot",
+  "original_code": "...",
+  "target_code": "...",
+  "intermediate_code": null,
+  "edit_record": {},
+  "validation_report": {
+    "ok": true
+  }
+}
+```
 
-- structural deletion;
-- delete slot / pocket / boss;
-- replace hole with slot inside the V2 add script;
-- feature-level recovery from arbitrary original CadQuery chains;
-- boss / pad union edits.
+## Stage 1.5 Selection
 
-The high-confidence `delete_hole` branch is documented separately as [V3](CAD_EDIT_PIPELINE_V3.md).
-The first high-confidence replacement branch is documented separately as [V4](CAD_EDIT_PIPELINE_V4.md).
+Current capped selected V2 distribution:
+
+| edit_type | selected |
+|---|---:|
+| `add_blind_hole` | 3,000 |
+| `add_pocket` | 3,000 |
+| `add_rectangular_slot` | 3,000 |
+| `add_through_hole` | 3,000 |
+
+## Stage 2 Instruction Generation
+
+V2 uses `structural_add` instruction mode.
+
+MLLM instructions must:
+
+- express adding, drilling, cutting a slot, or adding a recess;
+- mention the new feature type;
+- include key dimensions when available;
+- say the rest of the part remains unchanged;
+- avoid delete and replace semantics;
+- avoid code terms such as CadQuery, Workplane, CSG, cutter, source span.
+
+Example MLLM output:
+
+```text
+Add a rectangular pocket 38.72 mm long, 21.12 mm wide, and 14.08 mm deep on the front face of the part, keeping the rest of the part unchanged.
+```
+
+Current Stage 2 prompt uses:
+
+- English-only output;
+- Front, Top, Left image order;
+- no `target_code`;
+- no `intermediate_code`;
+- no deterministic template reference when `--omit-template-reference` is passed.
+
+## Recommended Stage 2 Command
+
+```powershell
+$env:DASHSCOPE_API_KEY="your_api_key"; python scripts\generate_stage2_instructions.py `
+  --input-dir outputs\stage1_5\v1_10k_v2_12k `
+  --output-dir outputs\stage2\v1_10k_v2_12k `
+  --model qwen3-vl-plus `
+  --image-root . `
+  --cache-dir outputs\stage2\cache `
+  --omit-template-reference `
+  --timeout-seconds 60 `
+  --retries 0 `
+  --workers 4
+```
+
+## Legacy Single-Branch Script
+
+For V2-only smoke tests:
+
+```powershell
+conda run -n cadedit-v1 python scripts\generate_cad_edit_structural_dataset.py `
+  --input data_t.jsonl `
+  --output outputs\cad_edit_v2.jsonl
+```
+
+For current dataset generation, prefer the Stage 1 / Stage 1.5 / Stage 2 pipeline.
+
+## Limitations
+
+- No structural deletion in V2.
+- No replacement in V2.
+- No arbitrary feature placement.
+- No edited three-view drawing generation.
+- Boss/pad additions are not part of the current validated production subset.

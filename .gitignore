@@ -5,6 +5,7 @@ __pycache__/
 # Full source data is too large for normal GitHub uploads.
 data.jsonl
 image.zip
+outputs/
 
 # Keep only the small test images referenced by data_t.jsonl.
 image/*

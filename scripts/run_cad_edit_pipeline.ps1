@@ -5,8 +5,8 @@ param(
     [switch]$UpdateEnv,
     [switch]$UseMllmInstructions,
     [switch]$DryRunInstructions,
-    [string]$InstructionModel = "qwen-vl-plus",
-    [string]$ApiKeyEnv = "DASHSCOPE_API_KEY,BAILIAN_API_KEY"
+    [string]$InstructionModel = "qwen3-vl-plus",
+    [string]$ApiKeyEnv = "DASHSCOPE_API_KEY,BAILIAN_API_KEY,QWEN_API_KEY"
 )
 
 $ErrorActionPreference = "Stop"

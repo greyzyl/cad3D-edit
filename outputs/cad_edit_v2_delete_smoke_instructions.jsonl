@@ -1,1 +1,0 @@
-{"candidate_id": "v2del_000001_001", "instruction": "删除零件上直径为 12.0 的圆孔，其余结构保持不变。", "instruction_meta": {"generator": "structural_delete_template", "fallback_used": true, "used_original_code": true, "used_candidate": true, "included_target_code": false, "instruction_mode": "structural_delete"}}
